@@ -13,7 +13,7 @@ import { Dumbbell, Zap, TrendingUp, Trophy, History, Loader2, Flame } from 'luci
 
 export default function HomePage() {
   const router = useRouter();
-  const { isAuthenticated, user, setTokens, setUser, setLoading } = useAuthStore();
+  const { isAuthenticated, setTokens, setUser, setLoading } = useAuthStore();
   const [profile, setProfile] = useState<any>(null);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [error, setError] = useState('');
@@ -118,19 +118,6 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
-      {/* Header */}
-      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <Dumbbell className="w-6 h-6 text-primary" />
-            <span className="text-xl font-bold">FitQuest</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">Welcome, {profile?.username || user?.username}</span>
-          </div>
-        </div>
-      </header>
-
       <main className="container mx-auto px-4 py-8 max-w-6xl">
         <div className="grid gap-6">
           {/* Stats Card */}
