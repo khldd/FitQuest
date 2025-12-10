@@ -1,0 +1,101 @@
+/* Professional muscle selector styles - ported from vue-muscle-group-selector */
+
+.muscle-groups {
+    position: relative;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.muscle-groups .muscles-helper {
+    display: none;
+}
+
+.muscle-groups svg {
+    max-height: 500px;
+    width: auto;
+    z-index: 100;
+}
+
+.muscle-groups svg g[id] path {
+    opacity: 0.2;
+    transition: opacity 0.25s ease-in-out, fill 0.25s ease-in-out;
+}
+
+.muscle-groups svg g g[id]:hover path {
+    cursor: pointer;
+    opacity: 0.5;
+    fill: hsl(var(--primary)) !important;
+}
+
+/* Selected states */
+.muscle-groups .biceps:checked~svg #Biceps path {
+    opacity: 0.8;
+    fill: hsl(var(--primary)) !important;
+}
+
+.muscle-groups .deltoids:checked~svg #Deltoids path {
+    opacity: 0.8;
+    fill: hsl(var(--primary)) !important;
+}
+
+.muscle-groups .forearms:checked~svg #Forearms path {
+    opacity: 0.8;
+    fill: hsl(var(--primary)) !important;
+}
+
+.muscle-groups .triceps:checked~svg #Triceps path {
+    opacity: 0.8;
+    fill: hsl(var(--primary)) !important;
+}
+
+.muscle-groups .trapezius:checked~svg #Trapezius path {
+    opacity: 0.8;
+    fill: hsl(var(--primary)) !important;
+}
+
+.muscle-groups .lats:checked~svg #Lats path {
+    opacity: 0.8;
+    fill: hsl(var(--primary)) !important;
+}
+
+.muscle-groups .abs:checked~svg #Abs path {
+    opacity: 0.8;
+    fill: hsl(var(--primary)) !important;
+}
+
+.muscle-groups .obliques:checked~svg #Obliques path {
+    opacity: 0.8;
+    fill: hsl(var(--primary)) !important;
+}
+
+.muscle-groups .pectorals:checked~svg #Pectorals path {
+    opacity: 0.8;
+    fill: hsl(var(--primary)) !important;
+}
+
+.muscle-groups .adductors:checked~svg #Adductors path {
+    opacity: 0.8;
+    fill: hsl(var(--primary)) !important;
+}
+
+.muscle-groups .calves:checked~svg #Calves path {
+    opacity: 0.8;
+    fill: hsl(var(--primary)) !important;
+}
+
+.muscle-groups .hamstrings:checked~svg #Hamstrings path {
+    opacity: 0.8;
+    fill: hsl(var(--primary)) !important;
+}
+
+.muscle-groups .glutes:checked~svg #Glutes path {
+    opacity: 0.8;
+    fill: hsl(var(--primary)) !important;
+}
+
+.muscle-groups .quads:checked~svg #Quads path {
+    opacity: 0.8;
+    fill: hsl(var(--primary)) !important;
+}
