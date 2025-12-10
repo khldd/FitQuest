@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "Bash(django-admin startproject:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
