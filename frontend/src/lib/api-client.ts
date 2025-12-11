@@ -393,3 +393,30 @@ export const socialAPI = {
         return response.data;
     },
 };
+
+// AI Coach API
+export const aiAPI = {
+    // Send message to AI coach
+    sendMessage: async (message: string) => {
+        const response = await apiClient.post('/ai/chat/send_message/', { message });
+        return response.data;
+    },
+
+    // Get chat history
+    getChatHistory: async () => {
+        const response = await apiClient.get('/ai/chat/');
+        return response.data;
+    },
+
+    // Clear chat history
+    clearHistory: async () => {
+        const response = await apiClient.delete('/ai/chat/clear_history/');
+        return response.data;
+    },
+
+    // Get user context (what AI knows about you)
+    getUserContext: async () => {
+        const response = await apiClient.get('/ai/chat/context/');
+        return response.data;
+    },
+};

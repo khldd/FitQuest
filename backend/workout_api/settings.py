@@ -2,6 +2,7 @@
 Django settings for workout_api project.
 """
 
+import os
 from pathlib import Path
 from decouple import config, Csv
 from datetime import timedelta
@@ -42,6 +43,7 @@ INSTALLED_APPS = [
     'achievements',
     'nutrition',
     'social',
+    'ai_coach',
 ]
 
 MIDDLEWARE = [
@@ -155,3 +157,8 @@ SIMPLE_JWT = {
 # CORS settings (Allow all for development)
 CORS_ALLOW_ALL_ORIGINS = True  # Only for development!
 CORS_ALLOW_CREDENTIALS = True
+# n8n AI Coach Webhook URL
+N8N_COACH_WEBHOOK_URL = os.environ.get(
+    'N8N_COACH_WEBHOOK_URL', 
+    'https://karim.n8nkk.tech/webhook/ai-coach'
+)

@@ -19,7 +19,8 @@ import {
     Apple,
     Users,
     Settings,
-    UserCircle
+    UserCircle,
+    Bot
 } from 'lucide-react';
 import {
     DropdownMenu,
@@ -33,6 +34,7 @@ import {
 const NAV_LINKS = [
     { href: '/', label: 'Home', icon: Home },
     { href: '/generator/muscle-selection', label: 'Generate', icon: Dumbbell },
+    { href: '/coach', label: 'AI Coach', icon: Bot },
     { href: '/analytics', label: 'Analytics', icon: BarChart3 },
     { href: '/social', label: 'Social', icon: Users },
     { href: '/nutrition', label: 'Nutrition', icon: Apple },

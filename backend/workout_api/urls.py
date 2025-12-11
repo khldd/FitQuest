@@ -35,6 +35,7 @@ urlpatterns = [
     path('api/achievements/', include('achievements.urls')),
     path('api/nutrition/', include('nutrition.urls')),
     path('api/social/', include('social.urls')),
+    path('api/ai/', include('ai_coach.urls')),
 ]
 
 if settings.DEBUG:
