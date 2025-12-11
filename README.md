@@ -4,8 +4,8 @@ A gamified workout generator application built with Next.js and Django.
 
 ## Team Members
 - Khaled - Frontend Core & UI
-- Malek - Backend & API Development
-- Haider - Features & Integration
+- Malek - Features & Integration
+- Haider - Backend & API Development
 
 ## Tech Stack
 
