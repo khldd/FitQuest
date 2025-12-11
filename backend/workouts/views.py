@@ -7,9 +7,15 @@ from .models import WorkoutHistory, GeneratedWorkout
 from .serializers import (
     WorkoutHistorySerializer,
     GeneratedWorkoutSerializer,
-    WorkoutGenerationRequestSerializer
+    WorkoutGenerationRequestSerializer,
+    AnalyticsSummarySerializer,
+    TrendsDataSerializer,
+    MuscleAnalyticsSerializer,
+    ConsistencyDataSerializer,
+    PersonalRecordsSerializer
 )
 from .workout_generator import WorkoutGenerator
+from .analytics import WorkoutAnalyticsService
 
 
 class WorkoutHistoryViewSet(viewsets.ModelViewSet):
@@ -28,6 +34,111 @@ class WorkoutHistoryViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+    @action(detail=False, methods=['get'])
+    def analytics_summary(self, request):
+        """Get analytics summary for user's workouts"""
+        # Parse query parameters
+        period = request.query_params.get('period', '30d')
+        start_date_str = request.query_params.get('start_date')
+        end_date_str = request.query_params.get('end_date')
+
+        # Parse dates
+        start_date, end_date, label = WorkoutAnalyticsService.parse_period(
+            period, start_date_str, end_date_str
+        )
+
+        # Get summary data
+        summary_data = WorkoutAnalyticsService.get_summary(
+            request.user, start_date, end_date
+        )
+
+        # Add period info
+        response_data = {
+            'period': {
+                'start': start_date.strftime('%Y-%m-%d') if start_date else None,
+                'end': end_date.strftime('%Y-%m-%d'),
+                'label': label
+            },
+            **summary_data
+        }
+
+        serializer = AnalyticsSummarySerializer(response_data)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def analytics_trends(self, request):
+        """Get workout trends over time"""
+        # Parse query parameters
+        period = request.query_params.get('period', '30d')
+        granularity = request.query_params.get('granularity', 'daily')
+        start_date_str = request.query_params.get('start_date')
+        end_date_str = request.query_params.get('end_date')
+
+        # Parse dates
+        start_date, end_date, _ = WorkoutAnalyticsService.parse_period(
+            period, start_date_str, end_date_str
+        )
+
+        # Get trends data
+        trends_data = WorkoutAnalyticsService.get_trends(
+            request.user, start_date, end_date, granularity
+        )
+
+        serializer = TrendsDataSerializer(trends_data)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def analytics_muscles(self, request):
+        """Get muscle group analytics"""
+        # Parse query parameters
+        period = request.query_params.get('period', '30d')
+        top_n = int(request.query_params.get('top_n', 10))
+        start_date_str = request.query_params.get('start_date')
+        end_date_str = request.query_params.get('end_date')
+
+        # Parse dates
+        start_date, end_date, _ = WorkoutAnalyticsService.parse_period(
+            period, start_date_str, end_date_str
+        )
+
+        # Get muscle analytics
+        muscle_data = WorkoutAnalyticsService.get_muscle_analytics(
+            request.user, start_date, end_date, top_n
+        )
+
+        serializer = MuscleAnalyticsSerializer(muscle_data)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def analytics_consistency(self, request):
+        """Get consistency and calendar data"""
+        # Parse query parameters
+        period = request.query_params.get('period', '90d')
+        start_date_str = request.query_params.get('start_date')
+        end_date_str = request.query_params.get('end_date')
+
+        # Parse dates
+        start_date, end_date, _ = WorkoutAnalyticsService.parse_period(
+            period, start_date_str, end_date_str
+        )
+
+        # Get consistency data
+        consistency_data = WorkoutAnalyticsService.get_consistency(
+            request.user, start_date, end_date
+        )
+
+        serializer = ConsistencyDataSerializer(consistency_data)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def analytics_records(self, request):
+        """Get personal records and milestones"""
+        # Get records data
+        records_data = WorkoutAnalyticsService.get_records(request.user)
+
+        serializer = PersonalRecordsSerializer(records_data)
+        return Response(serializer.data)
 
 
 class GeneratedWorkoutViewSet(viewsets.ModelViewSet):

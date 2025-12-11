@@ -85,3 +85,49 @@ export const authAPI = {
         return response.data;
     },
 };
+
+// Analytics API methods
+export const analyticsAPI = {
+    getSummary: async (params?: {
+        period?: '7d' | '30d' | '90d' | 'all';
+        start_date?: string;
+        end_date?: string;
+    }) => {
+        const response = await apiClient.get('/workouts/history/analytics_summary/', { params });
+        return response.data;
+    },
+
+    getTrends: async (params?: {
+        period?: '7d' | '30d' | '90d' | 'all';
+        granularity?: 'daily' | 'weekly' | 'monthly';
+        start_date?: string;
+        end_date?: string;
+    }) => {
+        const response = await apiClient.get('/workouts/history/analytics_trends/', { params });
+        return response.data;
+    },
+
+    getMuscles: async (params?: {
+        period?: '7d' | '30d' | '90d' | 'all';
+        top_n?: number;
+        start_date?: string;
+        end_date?: string;
+    }) => {
+        const response = await apiClient.get('/workouts/history/analytics_muscles/', { params });
+        return response.data;
+    },
+
+    getConsistency: async (params?: {
+        period?: '7d' | '30d' | '90d' | 'all';
+        start_date?: string;
+        end_date?: string;
+    }) => {
+        const response = await apiClient.get('/workouts/history/analytics_consistency/', { params });
+        return response.data;
+    },
+
+    getRecords: async () => {
+        const response = await apiClient.get('/workouts/history/analytics_records/');
+        return response.data;
+    },
+};

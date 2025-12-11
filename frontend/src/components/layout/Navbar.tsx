@@ -14,12 +14,14 @@ import {
     LogOut,
     Menu,
     X,
-    Zap
+    Zap,
+    BarChart3
 } from 'lucide-react';
 
 const NAV_LINKS = [
     { href: '/', label: 'Home', icon: Home },
     { href: '/generator/muscle-selection', label: 'Generate', icon: Dumbbell },
+    { href: '/analytics', label: 'Analytics', icon: BarChart3 },
     { href: '/history', label: 'History', icon: History },
     { href: '/calendar', label: 'Calendar', icon: Calendar },
 ];

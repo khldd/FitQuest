@@ -164,7 +164,7 @@ export default function HomePage() {
           </Card>
 
           {/* Quick Actions */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Button
               size="lg"
               className="h-24 text-lg gap-3 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-500"
@@ -178,10 +178,20 @@ export default function HomePage() {
               size="lg"
               variant="outline"
               className="h-24 text-lg gap-3"
-              onClick={() => router.push('/workout/active')}
+              onClick={() => router.push('/analytics')}
+            >
+              <TrendingUp className="w-6 h-6" />
+              View Analytics
+            </Button>
+
+            <Button
+              size="lg"
+              variant="outline"
+              className="h-24 text-lg gap-3"
+              onClick={() => router.push('/history')}
             >
               <History className="w-6 h-6" />
-              View Last Workout
+              Workout History
             </Button>
 
             <Button
