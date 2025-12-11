@@ -52,8 +52,18 @@ class UserProfileViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['patch'])
     def update_profile(self, request):
-        """Update the current user's profile"""
+        """Update the current user's profile and user info"""
         profile = request.user.profile
+        user = request.user
+        
+        # Update user first_name and last_name if provided
+        if 'first_name' in request.data:
+            user.first_name = request.data['first_name']
+        if 'last_name' in request.data:
+            user.last_name = request.data['last_name']
+        user.save()
+        
+        # Update profile fields (bio, avatar_url, etc.)
         serializer = self.get_serializer(profile, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()

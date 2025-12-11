@@ -16,13 +16,25 @@ import {
     X,
     Zap,
     BarChart3,
-    Apple
+    Apple,
+    Users,
+    Settings,
+    UserCircle
 } from 'lucide-react';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const NAV_LINKS = [
     { href: '/', label: 'Home', icon: Home },
     { href: '/generator/muscle-selection', label: 'Generate', icon: Dumbbell },
     { href: '/analytics', label: 'Analytics', icon: BarChart3 },
+    { href: '/social', label: 'Social', icon: Users },
     { href: '/nutrition', label: 'Nutrition', icon: Apple },
     { href: '/history', label: 'History', icon: History },
     { href: '/calendar', label: 'Calendar', icon: Calendar },
@@ -89,19 +101,31 @@ export function Navbar() {
                             <div className="w-24 h-8 bg-white/5 rounded-lg animate-pulse" />
                         ) : isAuthenticated ? (
                             <div className="flex items-center gap-3">
-                                <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-full">
-                                    <User className="w-4 h-4 text-muted-foreground" />
-                                    <span className="text-sm">{user?.username || 'User'}</span>
-                                </div>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={handleLogout}
-                                    className="gap-2 text-muted-foreground hover:text-foreground"
-                                >
-                                    <LogOut className="w-4 h-4" />
-                                    Logout
-                                </Button>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <button className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-full hover:bg-white/10 transition-colors cursor-pointer">
+                                            <User className="w-4 h-4 text-muted-foreground" />
+                                            <span className="text-sm">{user?.username || 'User'}</span>
+                                        </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-56">
+                                        <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onClick={() => router.push('/profile')}>
+                                            <UserCircle className="w-4 h-4 mr-2" />
+                                            My Profile
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => router.push('/settings')}>
+                                            <Settings className="w-4 h-4 mr-2" />
+                                            Settings
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onClick={handleLogout}>
+                                            <LogOut className="w-4 h-4 mr-2" />
+                                            Logout
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
                             </div>
                         ) : (
                             <div className="flex items-center gap-2">

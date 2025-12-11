@@ -84,6 +84,15 @@ export const authAPI = {
         const response = await apiClient.get('/accounts/profiles/me/');
         return response.data;
     },
+
+    updateProfile: async (data: {
+        first_name?: string;
+        last_name?: string;
+        bio?: string;
+    }) => {
+        const response = await apiClient.patch('/accounts/profiles/update_profile/', data);
+        return response.data;
+    },
 };
 
 // Analytics API methods
@@ -265,6 +274,77 @@ export const workoutAPI = {
     // Update workout history (mark as completed)
     updateHistory: async (id: number, data: any) => {
         const response = await apiClient.patch(`/workouts/history/${id}/`, data);
+        return response.data;
+    },
+};
+// Social API methods
+export const socialAPI = {
+    // Follow/Unfollow
+    followUser: async (userId: number) => {
+        const response = await apiClient.post('/social/follows/', { following_id: userId });
+        return response.data;
+    },
+
+    unfollowUser: async (userId: number) => {
+        const response = await apiClient.delete(`/social/follows/unfollow/?following_id=${userId}`);
+        return response.data;
+    },
+
+    getFollowing: async () => {
+        const response = await apiClient.get('/social/follows/following/');
+        return response.data;
+    },
+
+    getFollowers: async () => {
+        const response = await apiClient.get('/social/follows/followers/');
+        return response.data;
+    },
+
+    // Social Feed
+    getFeed: async () => {
+        const response = await apiClient.get('/social/feed/');
+        return response.data;
+    },
+
+    createPost: async (data: {
+        post_type: 'workout' | 'achievement' | 'milestone';
+        content: string;
+        workout_id?: number;
+        achievement_id?: number;
+        metadata?: any;
+    }) => {
+        const response = await apiClient.post('/social/feed/', data);
+        return response.data;
+    },
+
+    likePost: async (postId: number) => {
+        const response = await apiClient.post(`/social/feed/${postId}/like/`);
+        return response.data;
+    },
+
+    unlikePost: async (postId: number) => {
+        const response = await apiClient.delete(`/social/feed/${postId}/unlike/`);
+        return response.data;
+    },
+
+    commentOnPost: async (postId: number, content: string) => {
+        const response = await apiClient.post(`/social/feed/${postId}/comment/`, { content });
+        return response.data;
+    },
+
+    getMyPosts: async () => {
+        const response = await apiClient.get('/social/feed/my_posts/');
+        return response.data;
+    },
+
+    // User Search
+    searchUsers: async (search: string) => {
+        const response = await apiClient.get('/social/users/', { params: { search } });
+        return response.data;
+    },
+
+    getUserProfile: async (userId: number) => {
+        const response = await apiClient.get(`/social/users/${userId}/profile/`);
         return response.data;
     },
 };

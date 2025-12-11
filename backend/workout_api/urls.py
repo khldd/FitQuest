@@ -23,6 +23,7 @@ urlpatterns = [
     path('api/workouts/', include('workouts.urls')),
     path('api/achievements/', include('achievements.urls')),
     path('api/nutrition/', include('nutrition.urls')),
+    path('api/social/', include('social.urls')),
 ]
 
 if settings.DEBUG:

@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Download, Share2, Clock, Zap, Dumbbell, Play, Save, Home, RotateCcw, Loader2 } from 'lucide-react';
-import { workoutAPI } from '@/lib/api-client';
+import { workoutAPI, socialAPI } from '@/lib/api-client';
 import { useWorkoutConfigStore } from '@/store/workout-config-store';
 import { useMuscleStore } from '@/store/muscle-store';
 
@@ -26,6 +26,7 @@ export function WorkoutSummary({ workout }: SummaryProps) {
     const router = useRouter();
     const [isSaving, setIsSaving] = useState(false);
     const [isStarting, setIsStarting] = useState(false);
+    const [isSharing, setIsSharing] = useState(false);
     const [error, setError] = useState('');
     
     const { setting } = useWorkoutConfigStore();
@@ -110,8 +111,18 @@ export function WorkoutSummary({ workout }: SummaryProps) {
                     </p>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="gap-2">
-                        <Share2 className="w-4 h-4" /> Share
+                    <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="gap-2"
+                        onClick={handleShare}
+                        disabled={isSharing}
+                    >
+                        {isSharing ? (
+                            <><Loader2 className="w-4 h-4 animate-spin" /> Sharing...</>
+                        ) : (
+                            <><Share2 className="w-4 h-4" /> Share</>
+                        )}
                     </Button>
                     <Button variant="outline" size="sm" className="gap-2">
                         <Download className="w-4 h-4" /> Save PDF
