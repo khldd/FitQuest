@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, Wand2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Wand2, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { WizardProgress } from './WizardProgress';
@@ -13,15 +13,20 @@ import { ParametersStep } from './ParametersStep';
 
 import { useWorkoutConfigStore } from '@/store/workout-config-store';
 import { useMuscleStore } from '@/store/muscle-store';
+import { useWorkoutSessionStore } from '@/store/workout-session-store';
+import { workoutAPI } from '@/lib/api-client';
 
 export function WizardContainer() {
     const router = useRouter();
     const [step, setStep] = useState(1);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [error, setError] = useState('');
     const totalSteps = 3;
 
     // Stores to check valid state before proceeding
-    const { intensity, goal, setting } = useWorkoutConfigStore();
+    const { intensity, goal, setting, duration } = useWorkoutConfigStore();
     const { selectedMuscles } = useMuscleStore();
+    const { setWorkout } = useWorkoutSessionStore();
 
     const nextStep = () => {
         if (step < totalSteps) setStep(step + 1);
@@ -38,14 +43,41 @@ export function WizardContainer() {
         return true; // Step 3 always has defaults
     };
 
-    const handleGenerate = () => {
-        console.log('Generating Workout with:', {
-            muscles: selectedMuscles,
-            config: { intensity, goal, setting }
-        });
-        // In the future, we will POST to backend here.
-        // For now, redirect to the player which seeds the mock workout.
-        router.push('/workout/active');
+    const handleGenerate = async () => {
+        if (selectedMuscles.length === 0) {
+            setError('Please select at least one muscle group');
+            return;
+        }
+
+        setIsGenerating(true);
+        setError('');
+
+        try {
+            // Call the API to generate workout
+            const response = await workoutAPI.generateWorkout({
+                muscles_targeted: selectedMuscles,
+                duration: duration,
+                intensity: intensity as 'light' | 'moderate' | 'intense',
+                goal: goal as 'strength' | 'hypertrophy' | 'endurance',
+                equipment: setting as 'bodyweight' | 'home' | 'gym'
+            });
+
+            // Store the entire workout plan in session store
+            if (response.workout_plan) {
+                console.log('Storing workout plan:', response.workout_plan);
+                setWorkout(response.workout_plan);
+            } else {
+                console.error('No workout_plan in response:', response);
+            }
+
+            // Navigate to the workout display page
+            router.push('/workout/active');
+        } catch (err: any) {
+            console.error('Failed to generate workout:', err);
+            setError(err.response?.data?.message || 'Failed to generate workout. Please try again.');
+        } finally {
+            setIsGenerating(false);
+        }
     };
 
     return (
@@ -65,8 +97,14 @@ export function WizardContainer() {
                         {step === 3 && <ParametersStep key="step3" />}
                     </AnimatePresence>
 
+                    {error && (
+                        <div className="mt-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+                            {error}
+                        </div>
+                    )}
+
                     <div className="flex justify-between mt-8 pt-8 border-t border-border/50">
-                        <Button variant="ghost" onClick={prevStep} className="gap-2">
+                        <Button variant="ghost" onClick={prevStep} disabled={isGenerating} className="gap-2">
                             <ArrowLeft className="w-4 h-4" /> Back
                         </Button>
 
@@ -75,8 +113,20 @@ export function WizardContainer() {
                                 Next <ArrowRight className="w-4 h-4" />
                             </Button>
                         ) : (
-                            <Button onClick={handleGenerate} className="gap-2 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-500 text-white border-0 shadow-lg shadow-primary/25">
-                                <Wand2 className="w-4 h-4" /> Generate Workout
+                            <Button 
+                                onClick={handleGenerate} 
+                                disabled={isGenerating}
+                                className="gap-2 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-500 text-white border-0 shadow-lg shadow-primary/25"
+                            >
+                                {isGenerating ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" /> Generating...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Wand2 className="w-4 h-4" /> Generate Workout
+                                    </>
+                                )}
                             </Button>
                         )}
                     </div>

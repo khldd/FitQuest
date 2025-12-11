@@ -12,7 +12,6 @@ export function GoalStep() {
     const goals = [
         { value: 'hypertrophy', label: 'Hypertrophy', icon: BicepsFlexed, desc: 'Focus on muscle growth and volume.' },
         { value: 'strength', label: 'Strength', icon: Mountain, desc: 'Low reps, high weight, max power.' },
-        { value: 'fat_loss', label: 'Fat Loss', icon: Timer, desc: 'High heart rate, metabolic conditioning.' },
         { value: 'endurance', label: 'Endurance', icon: Boxes, desc: 'Sustained effort, higher reps.' },
     ];
 

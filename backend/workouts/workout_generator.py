@@ -119,7 +119,10 @@ class WorkoutGenerator:
             'rest_seconds': rest,
             'description': exercise.description,
             'instructions': exercise.instructions,
-            'tips': exercise.tips
+            'tips': exercise.tips,
+            'image_url': exercise.image_url or '',
+            'gif_url': exercise.gif_url or '',
+            'video_url': exercise.video_url or ''
         }
 
     def _get_warmup_recommendation(self, intensity):

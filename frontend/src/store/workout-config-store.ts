@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
-export type Intensity = 'light' | 'medium' | 'hard';
-export type Goal = 'hypertrophy' | 'strength' | 'fat_loss' | 'endurance';
+export type Intensity = 'light' | 'moderate' | 'intense';
+export type Goal = 'hypertrophy' | 'strength' | 'endurance';
 export type Setting = 'gym' | 'home' | 'bodyweight';
 
 interface WorkoutConfigState {

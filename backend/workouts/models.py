@@ -25,6 +25,12 @@ class WorkoutHistory(models.Model):
         ('gym', 'Full Gym'),
     ]
 
+    STATUS_CHOICES = [
+        ('planned', 'Planned'),
+        ('in_progress', 'In Progress'),
+        ('completed', 'Completed'),
+    ]
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='workout_history')
     workout_date = models.DateField(auto_now_add=True)
 
@@ -43,6 +49,14 @@ class WorkoutHistory(models.Model):
     # Workout details (stored as JSON)
     exercises_completed = models.JSONField(
         help_text="List of exercises with sets, reps, etc."
+    )
+
+    # Status tracking
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='completed',
+        help_text="Current status of the workout"
     )
 
     # Points earned
@@ -68,7 +82,8 @@ class WorkoutHistory(models.Model):
         return int(base_points * intensity_multiplier.get(self.intensity, 1.0))
 
     def save(self, *args, **kwargs):
-        if not self.points_earned:
+        # Only calculate points for completed workouts
+        if self.status == 'completed' and not self.points_earned:
             self.points_earned = self.calculate_points()
         super().save(*args, **kwargs)
 

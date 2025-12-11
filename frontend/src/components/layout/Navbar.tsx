@@ -15,13 +15,15 @@ import {
     Menu,
     X,
     Zap,
-    BarChart3
+    BarChart3,
+    Apple
 } from 'lucide-react';
 
 const NAV_LINKS = [
     { href: '/', label: 'Home', icon: Home },
     { href: '/generator/muscle-selection', label: 'Generate', icon: Dumbbell },
     { href: '/analytics', label: 'Analytics', icon: BarChart3 },
+    { href: '/nutrition', label: 'Nutrition', icon: Apple },
     { href: '/history', label: 'History', icon: History },
     { href: '/calendar', label: 'Calendar', icon: Calendar },
 ];

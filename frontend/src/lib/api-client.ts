@@ -131,3 +131,140 @@ export const analyticsAPI = {
         return response.data;
     },
 };
+
+// Presets API methods
+export const presetsAPI = {
+    getAll: async (params?: {
+        search?: string;
+        ordering?: string;
+    }) => {
+        const response = await apiClient.get('/exercises/presets/', { params });
+        return response.data;
+    },
+
+    getById: async (id: number) => {
+        const response = await apiClient.get(`/exercises/presets/${id}/`);
+        return response.data;
+    },
+};
+
+// Nutrition API methods
+export const nutritionAPI = {
+    // Food Items
+    searchFoods: async (search?: string) => {
+        const response = await apiClient.get('/nutrition/foods/', {
+            params: { search }
+        });
+        return response.data;
+    },
+
+    // Nutrition Goals
+    getGoal: async () => {
+        const response = await apiClient.get('/nutrition/goals/');
+        return response.data;
+    },
+
+    createGoal: async (data: {
+        daily_calories: number;
+        daily_protein: number;
+        daily_carbs: number;
+        daily_fat: number;
+        goal_type: 'maintain' | 'cut' | 'bulk';
+    }) => {
+        const response = await apiClient.post('/nutrition/goals/', data);
+        return response.data;
+    },
+
+    updateGoal: async (id: number, data: {
+        daily_calories: number;
+        daily_protein: number;
+        daily_carbs: number;
+        daily_fat: number;
+        goal_type: 'maintain' | 'cut' | 'bulk';
+    }) => {
+        const response = await apiClient.put(`/nutrition/goals/${id}/`, data);
+        return response.data;
+    },
+
+    // Meal Logs
+    getMealLogs: async (params?: {
+        date?: string;
+        meal_type?: string;
+    }) => {
+        const response = await apiClient.get('/nutrition/logs/', { params });
+        return response.data;
+    },
+
+    createMealLog: async (data: {
+        food_name: string;
+        calories: number;
+        protein: number;
+        carbs: number;
+        fat: number;
+        meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+        date: string;
+        food_item?: number;
+    }) => {
+        const response = await apiClient.post('/nutrition/logs/', data);
+        return response.data;
+    },
+
+    deleteMealLog: async (id: number) => {
+        const response = await apiClient.delete(`/nutrition/logs/${id}/`);
+        return response.data;
+    },
+
+    // Daily Summary
+    getDailySummary: async (date?: string) => {
+        const response = await apiClient.get('/nutrition/logs/daily_summary/', {
+            params: { date }
+        });
+        return response.data;
+    },
+};
+
+// Workout API methods
+export const workoutAPI = {
+    // Generate workout
+    generateWorkout: async (data: {
+        muscles_targeted: string[];
+        duration: number;
+        intensity: 'light' | 'moderate' | 'intense';
+        goal: 'strength' | 'hypertrophy' | 'endurance';
+        equipment: 'bodyweight' | 'home' | 'gym';
+    }) => {
+        const response = await apiClient.post('/workouts/generated/generate/', data);
+        return response.data;
+    },
+
+    // Fetch workout history
+    getHistory: async (params?: {
+        intensity?: string;
+        goal?: string;
+        equipment?: string;
+        ordering?: string;
+    }) => {
+        const response = await apiClient.get('/workouts/history/', { params });
+        return response.data;
+    },
+
+    // Create workout history entry
+    createHistory: async (data: {
+        muscles_targeted: string[];
+        duration: number;
+        intensity: string;
+        goal: string;
+        equipment: string;
+        exercises_completed: any[];
+        status?: 'planned' | 'in_progress' | 'completed';
+    }) => {
+        const response = await apiClient.post('/workouts/history/', data);
+        return response.data;
+    },
+
+    // Update workout history (mark as completed)
+    updateHistory: async (id: number, data: any) => {
+        const response = await apiClient.patch(`/workouts/history/${id}/`, data);
+        return response.data;
+    },
+};

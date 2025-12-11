@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMuscleStore } from '@/store/muscle-store';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
+import { PresetSelector } from '@/components/generator/PresetSelector';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import './muscle-selector.css';
 
 /**
@@ -16,6 +18,7 @@ export function MuscleSelectorContainer() {
     const router = useRouter();
     const containerRef = useRef<HTMLDivElement>(null);
     const { selectedMuscles, toggleMuscle, clearSelection } = useMuscleStore();
+    const [showPresets, setShowPresets] = useState(true);
 
     useEffect(() => {
         const container = containerRef.current;
@@ -62,15 +65,43 @@ export function MuscleSelectorContainer() {
     const STROKE_COLOR = '#000';
 
     return (
-        <div className="flex flex-col lg:flex-row h-[calc(100vh-4rem)] gap-6 p-4 md:p-8 max-w-[1600px] mx-auto">
-            {/* Left: Figure */}
-            <div className="flex-1 flex flex-col items-center justify-center bg-white/5 rounded-3xl border border-white/5 p-8">
-                <div className="text-center mb-6">
-                    <h1 className="text-3xl font-bold">Muscle Selection</h1>
-                    <p className="text-muted-foreground text-sm mt-2">
-                        Click on muscles to target them
-                    </p>
-                </div>
+        <div className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-6">
+            {/* Presets Section */}
+            <div className="bg-white/5 rounded-3xl border border-white/5 overflow-hidden">
+                <button
+                    onClick={() => setShowPresets(!showPresets)}
+                    className="w-full p-6 flex items-center justify-between hover:bg-white/5 transition-colors"
+                >
+                    <div className="text-left">
+                        <h2 className="text-xl font-bold">Quick Start Presets</h2>
+                        <p className="text-sm text-muted-foreground mt-1">
+                            Choose a preset to auto-select muscle groups
+                        </p>
+                    </div>
+                    {showPresets ? (
+                        <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                    ) : (
+                        <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                    )}
+                </button>
+
+                {showPresets && (
+                    <div className="p-6 pt-0">
+                        <PresetSelector onPresetSelect={() => setShowPresets(false)} />
+                    </div>
+                )}
+            </div>
+
+            {/* Muscle Selection Section */}
+            <div className="flex flex-col lg:flex-row gap-6 min-h-[calc(100vh-20rem)]">
+                {/* Left: Figure */}
+                <div className="flex-1 flex flex-col items-center justify-center bg-white/5 rounded-3xl border border-white/5 p-8">
+                    <div className="text-center mb-6">
+                        <h1 className="text-3xl font-bold">Manual Selection</h1>
+                        <p className="text-muted-foreground text-sm mt-2">
+                            Click on muscles to target them
+                        </p>
+                    </div>
 
                 <div className="muscle-groups-container w-full flex-1 flex items-center justify-center">
                     <div className="muscle-groups" ref={containerRef}>
@@ -308,6 +339,7 @@ export function MuscleSelectorContainer() {
                         </Button>
                     </div>
                 </div>
+            </div>
             </div>
         </div>
     );

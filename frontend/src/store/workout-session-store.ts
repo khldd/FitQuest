@@ -8,16 +8,28 @@ export interface Exercise {
     rest: number; // seconds
     instructions?: string[];
     muscleGroup?: string;
+    image_url?: string;
+    gif_url?: string;
+    video_url?: string;
+}
+
+export interface WorkoutPlan {
+    exercises: any[];
+    muscles_targeted: string[];
+    duration: number;
+    intensity: string;
+    goal: string;
+    equipment: string;
 }
 
 export interface WorkoutSessionState {
-    workout: Exercise[];
-    setWorkout: (exercises: Exercise[]) => void;
+    workout: WorkoutPlan | null;
+    setWorkout: (workout: WorkoutPlan) => void;
     clearWorkout: () => void;
 }
 
 export const useWorkoutSessionStore = create<WorkoutSessionState>((set) => ({
-    workout: [],
-    setWorkout: (exercises) => set({ workout: exercises }),
-    clearWorkout: () => set({ workout: [] }),
+    workout: null,
+    setWorkout: (workout) => set({ workout }),
+    clearWorkout: () => set({ workout: null }),
 }));

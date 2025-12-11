@@ -15,70 +15,73 @@ import {
     Circle,
     Calendar,
     Filter,
-    Plus
+    Plus,
+    Loader2
 } from 'lucide-react';
+import { workoutAPI } from '@/lib/api-client';
+import { useWorkoutSessionStore } from '@/store/workout-session-store';
 
-// Mock data - will be replaced with API call
-const MOCK_HISTORY = [
-    {
-        id: '1',
-        date: '2024-12-10',
-        muscles: ['Chest', 'Triceps'],
-        duration: 45,
-        intensity: 'moderate',
-        goal: 'hypertrophy',
-        exercises: 5,
-        isCompleted: true,
-        points: 68
-    },
-    {
-        id: '2',
-        date: '2024-12-08',
-        muscles: ['Back', 'Biceps'],
-        duration: 50,
-        intensity: 'intense',
-        goal: 'strength',
-        exercises: 6,
-        isCompleted: true,
-        points: 100
-    },
-    {
-        id: '3',
-        date: '2024-12-06',
-        muscles: ['Legs', 'Glutes'],
-        duration: 60,
-        intensity: 'intense',
-        goal: 'hypertrophy',
-        exercises: 7,
-        isCompleted: false,
-        points: 0
-    },
-    {
-        id: '4',
-        date: '2024-12-04',
-        muscles: ['Shoulders', 'Arms'],
-        duration: 40,
-        intensity: 'light',
-        goal: 'endurance',
-        exercises: 4,
-        isCompleted: true,
-        points: 40
-    },
-];
+interface WorkoutHistoryItem {
+    id: number;
+    workout_date: string;
+    muscles_targeted: string[];
+    duration: number;
+    intensity: string;
+    goal: string;
+    equipment: string;
+    exercises_completed: any[];
+    status: 'planned' | 'in_progress' | 'completed';
+    points_earned: number;
+}
 
 export default function HistoryPage() {
     const router = useRouter();
+    const { setWorkout } = useWorkoutSessionStore();
     const [filter, setFilter] = useState<'all' | 'completed' | 'pending'>('all');
-    const [workouts, setWorkouts] = useState(MOCK_HISTORY);
+    const [workouts, setWorkouts] = useState<WorkoutHistoryItem[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        loadWorkoutHistory();
+    }, []);
+
+    const loadWorkoutHistory = async () => {
+        setIsLoading(true);
+        setError('');
+        
+        try {
+            const response = await workoutAPI.getHistory();
+            
+            // Handle paginated response (Django REST Framework pagination)
+            // Response can be either an array or {count, next, previous, results}
+            let workoutData: WorkoutHistoryItem[] = [];
+            
+            if (Array.isArray(response)) {
+                workoutData = response;
+            } else if (response && response.results && Array.isArray(response.results)) {
+                workoutData = response.results;
+            }
+            
+            setWorkouts(workoutData);
+        } catch (err: any) {
+            console.error('Failed to load workout history:', err);
+            console.error('Error response:', err.response?.data);
+            setError('Failed to load workout history. Please try again.');
+            setWorkouts([]);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const filteredWorkouts = workouts.filter(w => {
-        if (filter === 'completed') return w.isCompleted;
-        if (filter === 'pending') return !w.isCompleted;
+        if (filter === 'completed') return w.status === 'completed';
+        if (filter === 'pending') return w.status === 'planned' || w.status === 'in_progress';
         return true;
     });
 
-    const totalPoints = workouts.reduce((sum, w) => sum + w.points, 0);
-    const completedCount = workouts.filter(w => w.isCompleted).length;
+    const totalPoints = workouts.reduce((sum, w) => sum + (w.points_earned || 0), 0);
+    const completedCount = workouts.filter(w => w.status === 'completed').length;
 
     const formatDate = (dateStr: string) => {
         const date = new Date(dateStr);
@@ -88,6 +91,44 @@ export default function HistoryPage() {
             day: 'numeric'
         });
     };
+
+    const handleCompleteWorkout = async (workoutId: number) => {
+        try {
+            await workoutAPI.updateHistory(workoutId, { status: 'completed' });
+            // Reload the history
+            await loadWorkoutHistory();
+        } catch (err: any) {
+            console.error('Failed to complete workout:', err);
+            alert('Failed to mark workout as complete. Please try again.');
+        }
+    };
+
+    const handleViewWorkout = (workout: WorkoutHistoryItem) => {
+        // Convert the workout history to workout plan format
+        const workoutPlan = {
+            exercises: workout.exercises_completed,
+            estimated_duration: workout.duration,
+            intensity: workout.intensity,
+            goal: workout.goal,
+            equipment: workout.equipment,
+            muscles_targeted: workout.muscles_targeted,
+            total_exercises: workout.exercises_completed?.length || 0
+        };
+        
+        // Store in session
+        setWorkout(workoutPlan);
+        
+        // Navigate to workout view
+        router.push('/workout/active');
+    };
+
+    if (isLoading) {
+        return (
+            <div className="max-w-4xl mx-auto p-6 flex items-center justify-center min-h-[400px]">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+        );
+    }
 
     return (
         <div className="max-w-4xl mx-auto p-6 space-y-8">
@@ -114,6 +155,13 @@ export default function HistoryPage() {
                     New Workout
                 </Button>
             </motion.div>
+
+            {/* Error Message */}
+            {error && (
+                <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+                    {error}
+                </div>
+            )}
 
             {/* Stats Summary */}
             <motion.div
@@ -180,12 +228,12 @@ export default function HistoryPage() {
                                     {/* Status Icon */}
                                     <div className={`
                                         p-3 rounded-full
-                                        ${workout.isCompleted
+                                        ${workout.status === 'completed'
                                             ? 'bg-green-500/20 text-green-400'
                                             : 'bg-yellow-500/20 text-yellow-400'
                                         }
                                     `}>
-                                        {workout.isCompleted
+                                        {workout.status === 'completed'
                                             ? <CheckCircle2 className="w-6 h-6" />
                                             : <Circle className="w-6 h-6" />
                                         }
@@ -195,7 +243,7 @@ export default function HistoryPage() {
                                     <div className="flex-grow space-y-2">
                                         <div className="flex flex-wrap items-center gap-2">
                                             <span className="font-semibold">
-                                                {formatDate(workout.date)}
+                                                {formatDate(workout.workout_date)}
                                             </span>
                                             <Badge variant="secondary" className="capitalize">
                                                 {workout.goal}
@@ -209,9 +257,14 @@ export default function HistoryPage() {
                                             >
                                                 {workout.intensity}
                                             </Badge>
+                                            {workout.status !== 'completed' && (
+                                                <Badge variant="outline" className="border-yellow-500/50 text-yellow-400">
+                                                    {workout.status === 'in_progress' ? 'In Progress' : 'Planned'}
+                                                </Badge>
+                                            )}
                                         </div>
                                         <div className="flex flex-wrap gap-1">
-                                            {workout.muscles.map(m => (
+                                            {workout.muscles_targeted.map(m => (
                                                 <Badge key={m} variant="secondary" className="text-xs">
                                                     {m}
                                                 </Badge>
@@ -224,12 +277,12 @@ export default function HistoryPage() {
                                             </span>
                                             <span className="flex items-center gap-1">
                                                 <Dumbbell className="w-4 h-4" />
-                                                {workout.exercises} exercises
+                                                {workout.exercises_completed?.length || 0} exercises
                                             </span>
-                                            {workout.isCompleted && (
+                                            {workout.status === 'completed' && (
                                                 <span className="flex items-center gap-1 text-primary">
                                                     <Zap className="w-4 h-4" />
-                                                    +{workout.points} pts
+                                                    +{workout.points_earned} pts
                                                 </span>
                                             )}
                                         </div>
@@ -237,11 +290,18 @@ export default function HistoryPage() {
 
                                     {/* Actions */}
                                     <div className="flex gap-2">
-                                        <Button variant="outline" size="sm">
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm"
+                                            onClick={() => handleViewWorkout(workout)}
+                                        >
                                             View
                                         </Button>
-                                        {!workout.isCompleted && (
-                                            <Button size="sm">
+                                        {workout.status !== 'completed' && (
+                                            <Button 
+                                                size="sm"
+                                                onClick={() => handleCompleteWorkout(workout.id)}
+                                            >
                                                 Complete
                                             </Button>
                                         )}

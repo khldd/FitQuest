@@ -10,6 +10,7 @@ class ExerciseSerializer(serializers.ModelSerializer):
             'id', 'name', 'primary_muscle', 'secondary_muscles', 'equipment',
             'difficulty', 'sets_min', 'sets_max', 'reps_min', 'reps_max',
             'rest_seconds', 'description', 'instructions', 'tips',
+            'image_url', 'gif_url', 'video_url',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']

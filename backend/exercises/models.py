@@ -62,6 +62,23 @@ class Exercise(models.Model):
         help_text="Exercise tips"
     )
 
+    # Media
+    image_url = models.URLField(
+        blank=True,
+        null=True,
+        help_text="URL to exercise demonstration image"
+    )
+    gif_url = models.URLField(
+        blank=True,
+        null=True,
+        help_text="URL to animated GIF demonstration"
+    )
+    video_url = models.URLField(
+        blank=True,
+        null=True,
+        help_text="URL to video demonstration (YouTube, etc.)"
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

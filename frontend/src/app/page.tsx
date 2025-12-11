@@ -3,18 +3,20 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
-import { authAPI } from '@/lib/api-client';
+import { authAPI, workoutAPI } from '@/lib/api-client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
-import { Dumbbell, Zap, TrendingUp, Trophy, History, Loader2, Flame } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Dumbbell, Zap, TrendingUp, Trophy, History, Loader2, Flame, Clock, CheckCircle2 } from 'lucide-react';
 
 export default function HomePage() {
   const router = useRouter();
   const { isAuthenticated, setTokens, setUser, setLoading } = useAuthStore();
   const [profile, setProfile] = useState<any>(null);
+  const [recentWorkouts, setRecentWorkouts] = useState<any[]>([]);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [error, setError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -22,6 +24,7 @@ export default function HomePage() {
   useEffect(() => {
     if (isAuthenticated) {
       loadUserProfile();
+      loadRecentWorkouts();
     }
   }, [isAuthenticated]);
 
@@ -32,6 +35,27 @@ export default function HomePage() {
     } catch (err) {
       console.error('Failed to load profile:', err);
     }
+  };
+
+  const loadRecentWorkouts = async () => {
+    try {
+      const response = await workoutAPI.getHistory({ ordering: '-workout_date' });
+      // Get the 5 most recent workouts
+      const workouts = response.results || response;
+      setRecentWorkouts(Array.isArray(workouts) ? workouts.slice(0, 5) : []);
+    } catch (err) {
+      console.error('Failed to load recent workouts:', err);
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -205,13 +229,73 @@ export default function HomePage() {
             </Button>
           </div>
 
-          {/* Recent Activity Placeholder */}
+          {/* Recent Activity */}
           <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Recent Activity</h3>
-            <div className="text-center py-8 text-muted-foreground">
-              <p>No recent workouts yet.</p>
-              <p className="text-sm mt-2">Generate your first workout to get started!</p>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Recent Activity</h3>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => router.push('/history')}
+              >
+                View All
+              </Button>
             </div>
+            
+            {recentWorkouts.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>No recent workouts yet.</p>
+                <p className="text-sm mt-2">Generate your first workout to get started!</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {recentWorkouts.map((workout) => (
+                  <div 
+                    key={workout.id} 
+                    className="flex items-center gap-4 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
+                    onClick={() => router.push('/history')}
+                  >
+                    <div className={`
+                      p-2 rounded-full
+                      ${workout.status === 'completed' 
+                        ? 'bg-green-500/20 text-green-400' 
+                        : 'bg-yellow-500/20 text-yellow-400'}
+                    `}>
+                      <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                    
+                    <div className="flex-grow min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-medium truncate">
+                          {workout.muscles_targeted?.slice(0, 2).join(', ')}
+                          {workout.muscles_targeted?.length > 2 && ` +${workout.muscles_targeted.length - 2}`}
+                        </span>
+                        <Badge variant="secondary" className="text-xs capitalize">
+                          {workout.goal}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {workout.duration}m
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Dumbbell className="w-3 h-3" />
+                          {workout.exercises_completed?.length || 0} exercises
+                        </span>
+                        <span>{formatDate(workout.workout_date)}</span>
+                      </div>
+                    </div>
+                    
+                    {workout.status === 'completed' && workout.points_earned > 0 && (
+                      <div className="text-sm font-medium text-primary">
+                        +{workout.points_earned} XP
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
         </div>
       </main>

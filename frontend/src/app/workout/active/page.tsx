@@ -36,22 +36,19 @@ const MOCK_WORKOUT = [
 ];
 
 export default function ActiveWorkoutPage() {
-    const { workout, setWorkout } = useWorkoutSessionStore();
+    const { workout } = useWorkoutSessionStore();
     const { intensity, goal, duration } = useWorkoutConfigStore();
 
-    useEffect(() => {
-        // In real app, we would fetch generated workout from API here
-        // For now, we seed the mock workout if none exists
-        if (!workout || workout.length === 0) {
-            setWorkout(MOCK_WORKOUT);
-        }
-    }, [workout, setWorkout]);
+    // If we have a generated workout from the API, use it
+    if (workout && workout.exercises) {
+        return <WorkoutSummary workout={workout} />;
+    }
 
-    // Construct the summary object
+    // Fallback to mock data if no workout generated yet
     const summaryData = {
-        exercises: workout.length > 0 ? workout : MOCK_WORKOUT,
+        exercises: MOCK_WORKOUT,
         duration: duration || 45,
-        intensity: intensity || 'medium',
+        intensity: intensity || 'moderate',
         goal: goal || 'hypertrophy'
     };
 

@@ -11,7 +11,7 @@ class WorkoutHistorySerializer(serializers.ModelSerializer):
         fields = [
             'id', 'user', 'user_username', 'workout_date', 'muscles_targeted',
             'duration', 'intensity', 'goal', 'equipment', 'exercises_completed',
-            'points_earned', 'created_at'
+            'status', 'points_earned', 'created_at'
         ]
         read_only_fields = ['id', 'user', 'workout_date', 'points_earned', 'created_at']
 

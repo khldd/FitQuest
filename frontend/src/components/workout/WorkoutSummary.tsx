@@ -1,11 +1,15 @@
 'use client';
 
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Download, Share2, Clock, Zap, Dumbbell, Play, Save, Home, RotateCcw } from 'lucide-react';
+import { Download, Share2, Clock, Zap, Dumbbell, Play, Save, Home, RotateCcw, Loader2 } from 'lucide-react';
+import { workoutAPI } from '@/lib/api-client';
+import { useWorkoutConfigStore } from '@/store/workout-config-store';
+import { useMuscleStore } from '@/store/muscle-store';
 
 interface SummaryProps {
     workout: {
@@ -13,24 +17,80 @@ interface SummaryProps {
         duration: number;
         intensity: string;
         goal: string;
+        muscles_targeted?: string[];
+        equipment?: string;
     }
 }
 
 export function WorkoutSummary({ workout }: SummaryProps) {
     const router = useRouter();
+    const [isSaving, setIsSaving] = useState(false);
+    const [isStarting, setIsStarting] = useState(false);
+    const [error, setError] = useState('');
+    
+    const { setting } = useWorkoutConfigStore();
+    const { selectedMuscles } = useMuscleStore();
 
     if (!workout?.exercises) return <div className="text-center p-10">Loading Plan...</div>;
 
-    const handleStartWorkout = () => {
-        // TODO: Save workout to history with "in_progress" status
-        // For now, just show alert
-        alert('Starting workout! (Session tracking coming soon)');
+    const handleStartWorkout = async () => {
+        setIsStarting(true);
+        setError('');
+
+        const payload = {
+            muscles_targeted: workout.muscles_targeted || selectedMuscles,
+            duration: (workout as any).estimated_duration || workout.duration,
+            intensity: workout.intensity,
+            goal: workout.goal,
+            equipment: workout.equipment || setting || 'gym',
+            exercises_completed: workout.exercises,
+            status: 'in_progress'
+        };
+
+        console.log('Sending workout data:', JSON.stringify(payload, null, 2));
+
+        try {
+            await workoutAPI.createHistory(payload);
+
+            alert('Workout started! (Full session tracking coming soon)');
+            router.push('/history');
+        } catch (err: any) {
+            console.error('Failed to start workout:', err);
+            console.error('Error response:', err.response?.data);
+            setError('Failed to start workout. Please try again.');
+        } finally {
+            setIsStarting(false);
+        }
     };
 
-    const handleSaveForLater = () => {
-        // TODO: Save workout to history with "planned" status
-        alert('Workout saved! (History feature coming soon)');
-        router.push('/history');
+    const handleSaveForLater = async () => {
+        setIsSaving(true);
+        setError('');
+
+        const payload = {
+            muscles_targeted: workout.muscles_targeted || selectedMuscles,
+            duration: (workout as any).estimated_duration || workout.duration,
+            intensity: workout.intensity,
+            goal: workout.goal,
+            equipment: workout.equipment || setting || 'gym',
+            exercises_completed: workout.exercises,
+            status: 'planned'
+        };
+
+        console.log('Sending workout data:', JSON.stringify(payload, null, 2));
+
+        try {
+            await workoutAPI.createHistory(payload);
+
+            alert('Workout saved for later!');
+            router.push('/history');
+        } catch (err: any) {
+            console.error('Failed to save workout:', err);
+            console.error('Error response:', err.response?.data);
+            setError('Failed to save workout. Please try again.');
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     return (
@@ -83,6 +143,13 @@ export function WorkoutSummary({ workout }: SummaryProps) {
                 ))}
             </motion.div>
 
+            {/* Error Message */}
+            {error && (
+                <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+                    {error}
+                </div>
+            )}
+
             {/* Exercise List */}
             <div className="space-y-4">
                 <h2 className="text-xl font-semibold flex items-center gap-2">
@@ -98,9 +165,28 @@ export function WorkoutSummary({ workout }: SummaryProps) {
                         >
                             <Card className="p-0 overflow-hidden border-white/5 bg-card/40 hover:bg-card/60 transition-colors group">
                                 <div className="p-6 flex flex-col md:flex-row gap-6 items-start md:items-center">
-                                    <div className="flex-shrink-0 w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center font-bold text-primary text-lg">
-                                        {i + 1}
-                                    </div>
+                                    {/* Exercise Image/GIF */}
+                                    {(ex.gif_url || ex.image_url) ? (
+                                        <div className="flex-shrink-0 w-20 h-20 md:w-24 md:h-24 rounded-lg overflow-hidden bg-black/20 border border-white/10">
+                                            <img
+                                                src={ex.gif_url || ex.image_url}
+                                                alt={ex.name}
+                                                className="w-full h-full object-cover"
+                                                onError={(e) => {
+                                                    // Fallback to number badge if image fails to load
+                                                    e.currentTarget.style.display = 'none';
+                                                    const parent = e.currentTarget.parentElement;
+                                                    if (parent) {
+                                                        parent.innerHTML = `<div class="w-full h-full bg-primary/20 rounded-lg flex items-center justify-center font-bold text-primary text-2xl">${i + 1}</div>`;
+                                                    }
+                                                }}
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div className="flex-shrink-0 w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center font-bold text-primary text-lg">
+                                            {i + 1}
+                                        </div>
+                                    )}
 
                                     <div className="flex-grow space-y-1">
                                         <div className="flex justify-between items-start">
@@ -108,7 +194,7 @@ export function WorkoutSummary({ workout }: SummaryProps) {
                                                 {ex.name}
                                             </h3>
                                             <Badge variant="secondary" className="uppercase text-[10px] tracking-wider">
-                                                {ex.muscleGroup || 'General'}
+                                                {ex.primary_muscle || 'General'}
                                             </Badge>
                                         </div>
                                         <div className="flex gap-4 text-sm text-muted-foreground">
@@ -116,19 +202,21 @@ export function WorkoutSummary({ workout }: SummaryProps) {
                                             <span>•</span>
                                             <span>{ex.reps} Reps</span>
                                             <span>•</span>
-                                            <span>{ex.rest}s Rest</span>
+                                            <span>{ex.rest_seconds}s Rest</span>
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* Instructions Preview */}
-                                <div className="bg-black/20 p-4 px-6 text-sm text-muted-foreground border-t border-white/5">
-                                    <ul className="list-disc list-inside space-y-1">
-                                        {ex.instructions?.slice(0, 2).map((inst: string, idx: number) => (
-                                            <li key={idx}>{inst}</li>
-                                        ))}
-                                    </ul>
-                                </div>
+                                {ex.instructions && ex.instructions.length > 0 && (
+                                    <div className="bg-black/20 p-4 px-6 text-sm text-muted-foreground border-t border-white/5">
+                                        <ul className="list-disc list-inside space-y-1">
+                                            {ex.instructions.slice(0, 2).map((inst: string, idx: number) => (
+                                                <li key={idx}>{inst}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
                             </Card>
                         </motion.div>
                     ))}
@@ -146,24 +234,45 @@ export function WorkoutSummary({ workout }: SummaryProps) {
                     size="lg"
                     className="flex-1 gap-2 h-14 text-lg"
                     onClick={handleStartWorkout}
+                    disabled={isStarting || isSaving}
                 >
-                    <Play className="w-5 h-5" />
-                    Start Workout
+                    {isStarting ? (
+                        <>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            Starting...
+                        </>
+                    ) : (
+                        <>
+                            <Play className="w-5 h-5" />
+                            Start Workout
+                        </>
+                    )}
                 </Button>
                 <Button
                     variant="outline"
                     size="lg"
                     className="flex-1 gap-2 h-14"
                     onClick={handleSaveForLater}
+                    disabled={isStarting || isSaving}
                 >
-                    <Save className="w-5 h-5" />
-                    Save for Later
+                    {isSaving ? (
+                        <>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            Saving...
+                        </>
+                    ) : (
+                        <>
+                            <Save className="w-5 h-5" />
+                            Save for Later
+                        </>
+                    )}
                 </Button>
                 <Button
                     variant="ghost"
                     size="lg"
                     className="gap-2"
                     onClick={() => router.push('/')}
+                    disabled={isStarting || isSaving}
                 >
                     <Home className="w-5 h-5" />
                     Home
@@ -173,6 +282,7 @@ export function WorkoutSummary({ workout }: SummaryProps) {
                     size="lg"
                     className="gap-2"
                     onClick={() => router.push('/generator/muscle-selection')}
+                    disabled={isStarting || isSaving}
                 >
                     <RotateCcw className="w-5 h-5" />
                     Generate Another

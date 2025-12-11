@@ -12,8 +12,8 @@ export function IntensityStep() {
 
     const options = [
         { value: 'light', label: 'Light', icon: Zap, desc: 'Active recovery, mobility, low impact.' },
-        { value: 'medium', label: 'Medium', icon: Flame, desc: 'Hypertrophy focused, challenging but manageable.' },
-        { value: 'hard', label: 'Hard', icon: Skull, desc: 'High intensity, failure testing, max effort.' },
+        { value: 'moderate', label: 'Moderate', icon: Flame, desc: 'Hypertrophy focused, challenging but manageable.' },
+        { value: 'intense', label: 'Intense', icon: Skull, desc: 'High intensity, failure testing, max effort.' },
     ];
 
     return (
