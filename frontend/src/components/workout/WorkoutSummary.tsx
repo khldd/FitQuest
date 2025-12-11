@@ -94,6 +94,44 @@ export function WorkoutSummary({ workout }: SummaryProps) {
         }
     };
 
+    const handleShare = async () => {
+        setIsSharing(true);
+        try {
+            // Create a shareable text summary
+            const workoutSummary = `
+🏋️ My Workout Plan
+
+📊 Stats:
+• ${workout.exercises.length} exercises
+• ${workout.duration} minutes
+• ${workout.intensity} intensity
+• ${workout.goal.replace('_', ' ')} focus
+
+💪 Exercises:
+${workout.exercises.map((ex, i) => `${i + 1}. ${ex.name} - ${ex.sets}x${ex.reps}`).join('\n')}
+
+Generated with FitQuest 💪
+            `.trim();
+
+            // Use Web Share API if available
+            if (navigator.share) {
+                await navigator.share({
+                    title: 'My Workout Plan',
+                    text: workoutSummary,
+                });
+            } else {
+                // Fallback: copy to clipboard
+                await navigator.clipboard.writeText(workoutSummary);
+                alert('Workout copied to clipboard!');
+            }
+        } catch (err) {
+            console.error('Failed to share:', err);
+            alert('Failed to share workout');
+        } finally {
+            setIsSharing(false);
+        }
+    };
+
     return (
         <div className="max-w-4xl mx-auto p-6 space-y-8">
             {/* Header */}

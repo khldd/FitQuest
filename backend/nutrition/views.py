@@ -1,10 +1,10 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.db.models import Sum
+from django.db.models import Sum, F
 from datetime import date
-from .models import FoodItem, NutritionGoal, MealLog
-from .serializers import FoodItemSerializer, NutritionGoalSerializer, MealLogSerializer
+from .models import FoodItem, NutritionGoal, MealLog, FavoriteMeal
+from .serializers import FoodItemSerializer, NutritionGoalSerializer, MealLogSerializer, FavoriteMealSerializer
 
 class FoodItemViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = FoodItem.objects.all()
@@ -61,3 +61,39 @@ class MealLogViewSet(viewsets.ModelViewSet):
             'total_carbs': summary['total_carbs'] or 0,
             'total_fat': summary['total_fat'] or 0
         })
+
+
+class FavoriteMealViewSet(viewsets.ModelViewSet):
+    serializer_class = FavoriteMealSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return FavoriteMeal.objects.filter(user=self.request.user).select_related('food_item')
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+    
+    @action(detail=True, methods=['post'])
+    def log_now(self, request, pk=None):
+        """Quick log a favorite meal to today's meals"""
+        favorite = self.get_object()
+        meal_type = request.data.get('meal_type', favorite.default_meal_type)
+        quantity = float(request.data.get('quantity', favorite.default_quantity))
+        log_date = request.data.get('date', str(date.today()))
+        
+        # Calculate macros based on quantity
+        food = favorite.food_item
+        meal_log = MealLog.objects.create(
+            user=request.user,
+            food_item=food,
+            food_name=favorite.name,
+            quantity=quantity,
+            calories=int(food.calories * quantity),
+            protein=food.protein * quantity,
+            carbs=food.carbs * quantity,
+            fat=food.fat * quantity,
+            meal_type=meal_type,
+            date=log_date
+        )
+        
+        return Response(MealLogSerializer(meal_log).data, status=status.HTTP_201_CREATED)

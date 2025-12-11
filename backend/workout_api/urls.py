@@ -5,12 +5,23 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.shortcuts import redirect
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
 
+
+def api_root(request):
+    """Redirect to frontend based on auth status"""
+    if request.user.is_authenticated:
+        return redirect('http://localhost:3000/')
+    else:
+        return redirect('http://localhost:3000/auth/login')
+
+
 urlpatterns = [
+    path('', api_root, name='api_root'),
     path('admin/', admin.site.urls),
 
     # JWT authentication endpoints

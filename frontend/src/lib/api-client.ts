@@ -206,6 +206,7 @@ export const nutritionAPI = {
 
     createMealLog: async (data: {
         food_name: string;
+        quantity: number;
         calories: number;
         protein: number;
         carbs: number;
@@ -215,6 +216,20 @@ export const nutritionAPI = {
         food_item?: number;
     }) => {
         const response = await apiClient.post('/nutrition/logs/', data);
+        return response.data;
+    },
+
+    updateMealLog: async (id: number, data: {
+        food_name?: string;
+        quantity?: number;
+        calories?: number;
+        protein?: number;
+        carbs?: number;
+        fat?: number;
+        meal_type?: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+        date?: string;
+    }) => {
+        const response = await apiClient.patch(`/nutrition/logs/${id}/`, data);
         return response.data;
     },
 
@@ -228,6 +243,36 @@ export const nutritionAPI = {
         const response = await apiClient.get('/nutrition/logs/daily_summary/', {
             params: { date }
         });
+        return response.data;
+    },
+
+    // Favorite Meals
+    getFavoriteMeals: async () => {
+        const response = await apiClient.get('/nutrition/favorites/');
+        return response.data;
+    },
+
+    createFavoriteMeal: async (data: {
+        food_item: number;
+        name: string;
+        default_quantity: number;
+        default_meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+    }) => {
+        const response = await apiClient.post('/nutrition/favorites/', data);
+        return response.data;
+    },
+
+    deleteFavoriteMeal: async (id: number) => {
+        const response = await apiClient.delete(`/nutrition/favorites/${id}/`);
+        return response.data;
+    },
+
+    logFavoriteNow: async (id: number, data?: {
+        meal_type?: string;
+        quantity?: number;
+        date?: string;
+    }) => {
+        const response = await apiClient.post(`/nutrition/favorites/${id}/log_now/`, data);
         return response.data;
     },
 };

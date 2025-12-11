@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import FoodItem, NutritionGoal, MealLog
+from .models import FoodItem, NutritionGoal, MealLog, FavoriteMeal
 
 class FoodItemSerializer(serializers.ModelSerializer):
     class Meta:
@@ -23,9 +23,18 @@ class NutritionGoalSerializer(serializers.ModelSerializer):
 class MealLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = MealLog
-        fields = ['id', 'food_item', 'food_name', 'calories', 'protein', 'carbs', 'fat', 'meal_type', 'date', 'created_at']
+        fields = ['id', 'food_item', 'food_name', 'quantity', 'calories', 'protein', 'carbs', 'fat', 'meal_type', 'date', 'created_at']
         read_only_fields = ['id', 'created_at']
 
+
+class FavoriteMealSerializer(serializers.ModelSerializer):
+    food_item_details = FoodItemSerializer(source='food_item', read_only=True)
+    
+    class Meta:
+        model = FavoriteMeal
+        fields = ['id', 'food_item', 'food_item_details', 'name', 'default_quantity', 'default_meal_type', 'created_at']
+        read_only_fields = ['id', 'created_at']
+    
     def create(self, validated_data):
         user = self.context['request'].user
-        return MealLog.objects.create(user=user, **validated_data)
+        return FavoriteMeal.objects.create(user=user, **validated_data)
