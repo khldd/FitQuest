@@ -35,3 +35,6 @@ Thumbs.db
 
 # Gemini artifacts
 .gemini/
+
+# Documentation
+todolist.md
