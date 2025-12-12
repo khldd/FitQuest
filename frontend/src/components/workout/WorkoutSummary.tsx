@@ -6,10 +6,11 @@ import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Download, Share2, Clock, Zap, Dumbbell, Play, Save, Home, RotateCcw, Loader2 } from 'lucide-react';
+import { Download, Share2, Clock, Zap, Dumbbell, Save, Home, RotateCcw, Loader2, Trophy } from 'lucide-react';
 import { workoutAPI, socialAPI } from '@/lib/api-client';
 import { useWorkoutConfigStore } from '@/store/workout-config-store';
 import { useMuscleStore } from '@/store/muscle-store';
+import { toast } from 'sonner';
 
 interface SummaryProps {
     workout: {
@@ -25,7 +26,6 @@ interface SummaryProps {
 export function WorkoutSummary({ workout }: SummaryProps) {
     const router = useRouter();
     const [isSaving, setIsSaving] = useState(false);
-    const [isStarting, setIsStarting] = useState(false);
     const [isSharing, setIsSharing] = useState(false);
     const [error, setError] = useState('');
     
@@ -33,36 +33,6 @@ export function WorkoutSummary({ workout }: SummaryProps) {
     const { selectedMuscles } = useMuscleStore();
 
     if (!workout?.exercises) return <div className="text-center p-10">Loading Plan...</div>;
-
-    const handleStartWorkout = async () => {
-        setIsStarting(true);
-        setError('');
-
-        const payload = {
-            muscles_targeted: workout.muscles_targeted || selectedMuscles,
-            duration: (workout as any).estimated_duration || workout.duration,
-            intensity: workout.intensity,
-            goal: workout.goal,
-            equipment: workout.equipment || setting || 'gym',
-            exercises_completed: workout.exercises,
-            status: 'in_progress'
-        };
-
-        console.log('Sending workout data:', JSON.stringify(payload, null, 2));
-
-        try {
-            await workoutAPI.createHistory(payload);
-
-            alert('Workout started! (Full session tracking coming soon)');
-            router.push('/history');
-        } catch (err: any) {
-            console.error('Failed to start workout:', err);
-            console.error('Error response:', err.response?.data);
-            setError('Failed to start workout. Please try again.');
-        } finally {
-            setIsStarting(false);
-        }
-    };
 
     const handleSaveForLater = async () => {
         setIsSaving(true);
@@ -81,9 +51,19 @@ export function WorkoutSummary({ workout }: SummaryProps) {
         console.log('Sending workout data:', JSON.stringify(payload, null, 2));
 
         try {
-            await workoutAPI.createHistory(payload);
+            const response = await workoutAPI.createHistory(payload);
 
-            alert('Workout saved for later!');
+            // Check for newly unlocked achievements
+            if (response.newly_unlocked_achievements && response.newly_unlocked_achievements.length > 0) {
+                response.newly_unlocked_achievements.forEach((achievement: any) => {
+                    toast.success(`🏆 Achievement Unlocked: ${achievement.name}!`, {
+                        description: `${achievement.description} (+${achievement.points} XP)`,
+                        duration: 5000,
+                    });
+                });
+            }
+
+            toast.success('Workout saved for later!');
             router.push('/history');
         } catch (err: any) {
             console.error('Failed to save workout:', err);
@@ -280,29 +260,11 @@ Generated with FitQuest 💪
                 className="flex flex-col sm:flex-row gap-4 pt-6 border-t border-white/10"
             >
                 <Button
-                    size="lg"
-                    className="flex-1 gap-2 h-14 text-lg"
-                    onClick={handleStartWorkout}
-                    disabled={isStarting || isSaving}
-                >
-                    {isStarting ? (
-                        <>
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                            Starting...
-                        </>
-                    ) : (
-                        <>
-                            <Play className="w-5 h-5" />
-                            Start Workout
-                        </>
-                    )}
-                </Button>
-                <Button
-                    variant="outline"
+                    variant="default"
                     size="lg"
                     className="flex-1 gap-2 h-14"
                     onClick={handleSaveForLater}
-                    disabled={isStarting || isSaving}
+                    disabled={isSaving}
                 >
                     {isSaving ? (
                         <>
@@ -312,7 +274,7 @@ Generated with FitQuest 💪
                     ) : (
                         <>
                             <Save className="w-5 h-5" />
-                            Save for Later
+                            Save Workout
                         </>
                     )}
                 </Button>
@@ -321,7 +283,7 @@ Generated with FitQuest 💪
                     size="lg"
                     className="gap-2"
                     onClick={() => router.push('/')}
-                    disabled={isStarting || isSaving}
+                    disabled={isSaving}
                 >
                     <Home className="w-5 h-5" />
                     Home
@@ -331,7 +293,7 @@ Generated with FitQuest 💪
                     size="lg"
                     className="gap-2"
                     onClick={() => router.push('/generator/muscle-selection')}
-                    disabled={isStarting || isSaving}
+                    disabled={isSaving}
                 >
                     <RotateCcw className="w-5 h-5" />
                     Generate Another

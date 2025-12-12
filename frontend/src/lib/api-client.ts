@@ -420,3 +420,18 @@ export const aiAPI = {
         return response.data;
     },
 };
+
+// Achievements API
+export const achievementsAPI = {
+    // Get all achievements with unlock status
+    getMyAchievements: async () => {
+        const response = await apiClient.get('/achievements/user/my_achievements/');
+        return response.data;
+    },
+
+    // Get only unlocked achievements (recent)
+    getUnlockedAchievements: async (params?: { ordering?: string; limit?: number }) => {
+        const response = await apiClient.get('/achievements/user/', { params });
+        return response.data;
+    },
+};

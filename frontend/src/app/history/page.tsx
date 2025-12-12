@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { workoutAPI } from '@/lib/api-client';
 import { useWorkoutSessionStore } from '@/store/workout-session-store';
+import { toast } from 'sonner';
 
 interface WorkoutHistoryItem {
     id: number;
@@ -94,12 +95,24 @@ export default function HistoryPage() {
 
     const handleCompleteWorkout = async (workoutId: number) => {
         try {
-            await workoutAPI.updateHistory(workoutId, { status: 'completed' });
+            const response = await workoutAPI.updateHistory(workoutId, { status: 'completed' });
+            
+            // Check for newly unlocked achievements
+            if (response.newly_unlocked_achievements && response.newly_unlocked_achievements.length > 0) {
+                response.newly_unlocked_achievements.forEach((achievement: any) => {
+                    toast.success(`🏆 Achievement Unlocked: ${achievement.name}!`, {
+                        description: `${achievement.description} (+${achievement.points} XP)`,
+                        duration: 5000,
+                    });
+                });
+            }
+            
+            toast.success('Workout marked as complete!');
             // Reload the history
             await loadWorkoutHistory();
         } catch (err: any) {
             console.error('Failed to complete workout:', err);
-            alert('Failed to mark workout as complete. Please try again.');
+            toast.error('Failed to mark workout as complete. Please try again.');
         }
     };
 

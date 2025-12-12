@@ -35,6 +35,63 @@ class WorkoutHistoryViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
+    def update(self, request, *args, **kwargs):
+        # Get user's unlocked achievements before updating workout
+        from achievements.models import UserAchievement, Achievement
+        from achievements.serializers import AchievementSerializer
+        
+        before_achievements = set(
+            UserAchievement.objects.filter(user=request.user).values_list('achievement_id', flat=True)
+        )
+        
+        # Update the workout (this triggers the signal if status changed to completed)
+        response = super().update(request, *args, **kwargs)
+        
+        # Check for newly unlocked achievements
+        after_achievements = set(
+            UserAchievement.objects.filter(user=request.user).values_list('achievement_id', flat=True)
+        )
+        
+        newly_unlocked_ids = after_achievements - before_achievements
+        
+        if newly_unlocked_ids:
+            newly_unlocked = Achievement.objects.filter(id__in=newly_unlocked_ids)
+            achievements_data = AchievementSerializer(newly_unlocked, many=True).data
+            response.data['newly_unlocked_achievements'] = achievements_data
+        else:
+            response.data['newly_unlocked_achievements'] = []
+        
+        return response
+
+    def create(self, request, *args, **kwargs):
+        # Get user's unlocked achievements before creating workout
+        from achievements.models import UserAchievement
+        from achievements.serializers import AchievementSerializer
+        
+        before_achievements = set(
+            UserAchievement.objects.filter(user=request.user).values_list('achievement_id', flat=True)
+        )
+        
+        # Create the workout (this triggers the signal)
+        response = super().create(request, *args, **kwargs)
+        
+        # Check for newly unlocked achievements
+        after_achievements = set(
+            UserAchievement.objects.filter(user=request.user).values_list('achievement_id', flat=True)
+        )
+        
+        newly_unlocked_ids = after_achievements - before_achievements
+        
+        if newly_unlocked_ids:
+            from achievements.models import Achievement
+            newly_unlocked = Achievement.objects.filter(id__in=newly_unlocked_ids)
+            achievements_data = AchievementSerializer(newly_unlocked, many=True).data
+            response.data['newly_unlocked_achievements'] = achievements_data
+        else:
+            response.data['newly_unlocked_achievements'] = []
+        
+        return response
+
     @action(detail=False, methods=['get'])
     def analytics_summary(self, request):
         """Get analytics summary for user's workouts"""

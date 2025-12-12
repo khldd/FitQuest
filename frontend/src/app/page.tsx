@@ -3,20 +3,21 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
-import { authAPI, workoutAPI } from '@/lib/api-client';
+import { authAPI, workoutAPI, achievementsAPI } from '@/lib/api-client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Dumbbell, Zap, TrendingUp, Trophy, History, Loader2, Flame, Clock, CheckCircle2 } from 'lucide-react';
+import { Dumbbell, Zap, TrendingUp, Trophy, History, Loader2, Flame, Clock, CheckCircle2, Award } from 'lucide-react';
 
 export default function HomePage() {
   const router = useRouter();
   const { isAuthenticated, setTokens, setUser, setLoading } = useAuthStore();
   const [profile, setProfile] = useState<any>(null);
   const [recentWorkouts, setRecentWorkouts] = useState<any[]>([]);
+  const [recentAchievements, setRecentAchievements] = useState<any[]>([]);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [error, setError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -25,6 +26,7 @@ export default function HomePage() {
     if (isAuthenticated) {
       loadUserProfile();
       loadRecentWorkouts();
+      loadRecentAchievements();
     }
   }, [isAuthenticated]);
 
@@ -45,6 +47,19 @@ export default function HomePage() {
       setRecentWorkouts(Array.isArray(workouts) ? workouts.slice(0, 5) : []);
     } catch (err) {
       console.error('Failed to load recent workouts:', err);
+    }
+  };
+
+  const loadRecentAchievements = async () => {
+    try {
+      const response = await achievementsAPI.getUnlockedAchievements({ 
+        ordering: '-unlocked_at' 
+      });
+      // Get the 3 most recent achievements
+      const achievements = response.results || response;
+      setRecentAchievements(Array.isArray(achievements) ? achievements.slice(0, 3) : []);
+    } catch (err) {
+      console.error('Failed to load recent achievements:', err);
     }
   };
 
@@ -222,7 +237,7 @@ export default function HomePage() {
               size="lg"
               variant="outline"
               className="h-24 text-lg gap-3"
-              onClick={() => alert('Achievements coming soon!')}
+              onClick={() => router.push('/achievements')}
             >
               <Trophy className="w-6 h-6" />
               My Achievements
@@ -294,6 +309,73 @@ export default function HomePage() {
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+          </Card>
+
+          {/* Recent Achievements */}
+          <Card className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-yellow-500" />
+                Recent Achievements
+              </h3>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => router.push('/achievements')}
+              >
+                View All
+              </Button>
+            </div>
+            
+            {recentAchievements.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>No achievements unlocked yet.</p>
+                <p className="text-sm mt-2">Complete workouts to unlock achievements!</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {recentAchievements.map((userAchievement: any) => {
+                  const achievement = userAchievement.achievement;
+                  const tierColors: Record<string, string> = {
+                    bronze: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+                    silver: 'bg-gray-400/20 text-gray-300 border-gray-400/30',
+                    gold: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+                    platinum: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
+                  };
+                  
+                  return (
+                    <div 
+                      key={userAchievement.id} 
+                      className="flex items-center gap-4 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
+                      onClick={() => router.push('/achievements')}
+                    >
+                      <div className={`p-3 rounded-full text-2xl ${tierColors[achievement.tier]}`}>
+                        {achievement.icon}
+                      </div>
+                      
+                      <div className="flex-grow min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-medium">{achievement.name}</span>
+                          <Badge 
+                            variant="secondary" 
+                            className={`text-xs capitalize ${tierColors[achievement.tier]}`}
+                          >
+                            {achievement.tier}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {achievement.description}
+                        </p>
+                      </div>
+                      
+                      <div className="text-sm font-medium text-primary">
+                        +{achievement.points} XP
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </Card>
