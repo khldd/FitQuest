@@ -77,11 +77,6 @@ npm run dev
 
 Visit `http://localhost:3000` and start your quest!
 
-## 👥 The Team
-
-*   **Khaled** - Frontend Core & UI Architecture
-*   **Malek** - Feature Implementation & Integration
-*   **Haider** - Backend Logic & API Development
 
 ---
 
