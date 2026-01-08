@@ -19,7 +19,7 @@ class AchievementViewSet(viewsets.ReadOnlyModelViewSet):
 
 class UserAchievementViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet for UserAchievement model (read-only)"""
-    queryset = UserAchievement.objects.all()
+    queryset = UserAchievement.objects.select_related('achievement')
     serializer_class = UserAchievementSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
@@ -28,28 +28,35 @@ class UserAchievementViewSet(viewsets.ReadOnlyModelViewSet):
     ordering = ['-unlocked_at']
 
     def get_queryset(self):
-        # Users can only see their own achievements
-        return UserAchievement.objects.filter(user=self.request.user)
+        # Users can only see their own achievements with related data pre-fetched
+        return UserAchievement.objects.filter(
+            user=self.request.user
+        ).select_related('achievement')
 
     @action(detail=False, methods=['get'])
     def my_achievements(self, request):
         """Get all achievements for the current user with unlock status"""
+        # Fetch all achievements in a single query
         all_achievements = Achievement.objects.all()
-        unlocked_ids = UserAchievement.objects.filter(
+        
+        # Bulk fetch all user achievements in a single query and create a lookup dict
+        user_achievements = UserAchievement.objects.filter(
             user=request.user
-        ).values_list('achievement_id', flat=True)
+        ).select_related('achievement')
+        
+        # Create a dictionary for O(1) lookup: achievement_id -> unlocked_at
+        unlocked_map = {
+            ua.achievement_id: ua.unlocked_at 
+            for ua in user_achievements
+        }
 
+        # Build response without N+1 queries
         achievements_data = []
         for achievement in all_achievements:
             data = AchievementSerializer(achievement).data
-            data['unlocked'] = achievement.id in unlocked_ids
-            if data['unlocked']:
-                user_achievement = UserAchievement.objects.get(
-                    user=request.user, achievement=achievement
-                )
-                data['unlocked_at'] = user_achievement.unlocked_at
-            else:
-                data['unlocked_at'] = None
+            unlocked_at = unlocked_map.get(achievement.id)
+            data['unlocked'] = unlocked_at is not None
+            data['unlocked_at'] = unlocked_at
             achievements_data.append(data)
 
         return Response(achievements_data)

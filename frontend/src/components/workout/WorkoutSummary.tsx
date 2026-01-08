@@ -45,7 +45,7 @@ export function WorkoutSummary({ workout }: SummaryProps) {
             goal: workout.goal,
             equipment: workout.equipment || setting || 'gym',
             exercises_completed: workout.exercises,
-            status: 'planned'
+            status: 'planned' as const
         };
 
         console.log('Sending workout data:', JSON.stringify(payload, null, 2));

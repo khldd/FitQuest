@@ -1,7 +1,9 @@
 """
 Analytics service for workout data aggregation and analysis.
+Optimized with database-level aggregations for better performance.
 """
-from django.db.models import Count, Sum, Avg, Max, Q
+from django.db.models import Count, Sum, Avg, Max, Q, Case, When, Value, FloatField
+from django.db.models.functions import ExtractWeekDay
 from django.utils import timezone
 from datetime import datetime, timedelta
 from collections import defaultdict
@@ -10,6 +12,9 @@ from .models import WorkoutHistory
 
 class WorkoutAnalyticsService:
     """Service class for workout analytics calculations"""
+
+    # Class-level constants for intensity scoring
+    INTENSITY_SCORES = {'light': 1.0, 'moderate': 1.5, 'intense': 2.0}
 
     @staticmethod
     def parse_period(period_str, start_date=None, end_date=None):
@@ -43,10 +48,21 @@ class WorkoutAnalyticsService:
 
         return period_map.get(period_str, period_map['30d'])
 
-    @staticmethod
-    def get_summary(user, start_date=None, end_date=None):
+    @classmethod
+    def _get_base_queryset(cls, user, start_date=None, end_date=None):
+        """Helper to get filtered base queryset"""
+        workouts = WorkoutHistory.objects.filter(user=user)
+        if start_date:
+            workouts = workouts.filter(workout_date__gte=start_date)
+        if end_date:
+            workouts = workouts.filter(workout_date__lte=end_date)
+        return workouts
+
+    @classmethod
+    def get_summary(cls, user, start_date=None, end_date=None):
         """
         Get summary analytics for user's workouts.
+        Optimized to use database aggregations instead of Python loops.
 
         Args:
             user: User instance
@@ -56,17 +72,31 @@ class WorkoutAnalyticsService:
         Returns:
             dict: Summary statistics
         """
-        # Base queryset
-        workouts = WorkoutHistory.objects.filter(user=user)
+        workouts = cls._get_base_queryset(user, start_date, end_date)
 
-        # Apply date filters
-        if start_date:
-            workouts = workouts.filter(workout_date__gte=start_date)
-        if end_date:
-            workouts = workouts.filter(workout_date__lte=end_date)
+        # Single query with all aggregations including intensity scoring
+        aggregates = workouts.aggregate(
+            total_workouts=Count('id'),
+            total_duration=Sum('duration'),
+            total_points=Sum('points_earned'),
+            avg_duration=Avg('duration'),
+            # Calculate intensity counts in single query
+            light_count=Count('id', filter=Q(intensity='light')),
+            moderate_count=Count('id', filter=Q(intensity='moderate')),
+            intense_count=Count('id', filter=Q(intensity='intense')),
+            # Calculate weighted intensity score using Case/When at DB level
+            intensity_score_sum=Sum(
+                Case(
+                    When(intensity='light', then=Value(1.0)),
+                    When(intensity='moderate', then=Value(1.5)),
+                    When(intensity='intense', then=Value(2.0)),
+                    default=Value(1.0),
+                    output_field=FloatField()
+                )
+            )
+        )
 
-        # Calculate metrics
-        total_workouts = workouts.count()
+        total_workouts = aggregates['total_workouts'] or 0
 
         if total_workouts == 0:
             return {
@@ -83,32 +113,21 @@ class WorkoutAnalyticsService:
                 'equipment_breakdown': {}
             }
 
-        aggregates = workouts.aggregate(
-            total_duration=Sum('duration'),
-            total_points=Sum('points_earned'),
-            avg_duration=Avg('duration')
-        )
+        # Calculate average intensity from pre-computed sum
+        avg_intensity = (aggregates['intensity_score_sum'] or 0) / total_workouts
 
-        # Calculate average intensity score
-        intensity_scores = {'light': 1.0, 'moderate': 1.5, 'intense': 2.0}
-        intensity_sum = sum(
-            intensity_scores.get(w.intensity, 1.0)
-            for w in workouts
-        )
-        avg_intensity = intensity_sum / total_workouts if total_workouts > 0 else 0
-
-        # Breakdown by intensity
+        # Breakdown by intensity from aggregates (no additional query)
         intensity_breakdown = {
-            'light': workouts.filter(intensity='light').count(),
-            'moderate': workouts.filter(intensity='moderate').count(),
-            'intense': workouts.filter(intensity='intense').count()
+            'light': aggregates['light_count'] or 0,
+            'moderate': aggregates['moderate_count'] or 0,
+            'intense': aggregates['intense_count'] or 0
         }
 
-        # Breakdown by goal
+        # Breakdown by goal (single query)
         goal_counts = workouts.values('goal').annotate(count=Count('id'))
         goal_breakdown = {item['goal']: item['count'] for item in goal_counts if item['goal']}
 
-        # Breakdown by equipment
+        # Breakdown by equipment (single query)
         equipment_counts = workouts.values('equipment').annotate(count=Count('id'))
         equipment_breakdown = {item['equipment']: item['count'] for item in equipment_counts}
 
@@ -126,10 +145,11 @@ class WorkoutAnalyticsService:
             'equipment_breakdown': equipment_breakdown
         }
 
-    @staticmethod
-    def get_trends(user, start_date=None, end_date=None, granularity='daily'):
+    @classmethod
+    def get_trends(cls, user, start_date=None, end_date=None, granularity='daily'):
         """
         Get time-series trends for workouts.
+        Optimized with database-level intensity calculation.
 
         Args:
             user: User instance
@@ -140,41 +160,39 @@ class WorkoutAnalyticsService:
         Returns:
             dict: Trends data with granularity and data points
         """
-        # Base queryset
-        workouts = WorkoutHistory.objects.filter(user=user)
+        workouts = cls._get_base_queryset(user, start_date, end_date)
 
-        # Apply date filters
-        if start_date:
-            workouts = workouts.filter(workout_date__gte=start_date)
-        if end_date:
-            workouts = workouts.filter(workout_date__lte=end_date)
-
-        # Group by date
+        # Group by date with all aggregations in a single query
         if granularity == 'daily':
             grouped = workouts.values('workout_date').annotate(
                 workouts=Count('id'),
                 duration=Sum('duration'),
-                points=Sum('points_earned')
+                points=Sum('points_earned'),
+                # Calculate intensity score sum at database level
+                intensity_score_sum=Sum(
+                    Case(
+                        When(intensity='light', then=Value(1.0)),
+                        When(intensity='moderate', then=Value(1.5)),
+                        When(intensity='intense', then=Value(2.0)),
+                        default=Value(1.0),
+                        output_field=FloatField()
+                    )
+                )
             ).order_by('workout_date')
 
-            # Calculate avg intensity for each date
-            data_points = []
-            for group in grouped:
-                date_workouts = workouts.filter(workout_date=group['workout_date'])
-                intensity_scores = {'light': 1.0, 'moderate': 1.5, 'intense': 2.0}
-                intensity_sum = sum(
-                    intensity_scores.get(w.intensity, 1.0)
-                    for w in date_workouts
-                )
-                avg_intensity = intensity_sum / group['workouts'] if group['workouts'] > 0 else 0
-
-                data_points.append({
+            # Build data points without additional queries
+            data_points = [
+                {
                     'date': group['workout_date'].strftime('%Y-%m-%d'),
                     'workouts': group['workouts'],
                     'duration': group['duration'] or 0,
                     'points': group['points'] or 0,
-                    'avg_intensity': round(avg_intensity, 2)
-                })
+                    'avg_intensity': round(
+                        (group['intensity_score_sum'] or 0) / group['workouts'], 2
+                    ) if group['workouts'] > 0 else 0
+                }
+                for group in grouped
+            ]
 
             return {
                 'granularity': 'daily',
@@ -188,10 +206,12 @@ class WorkoutAnalyticsService:
             'data': []
         }
 
-    @staticmethod
-    def get_muscle_analytics(user, start_date=None, end_date=None, top_n=10):
+    @classmethod
+    def get_muscle_analytics(cls, user, start_date=None, end_date=None, top_n=10):
         """
         Get muscle group frequency analysis.
+        Note: JSON field parsing still requires Python-level processing,
+        but we minimize queries by fetching only needed fields.
 
         Args:
             user: User instance
@@ -202,30 +222,26 @@ class WorkoutAnalyticsService:
         Returns:
             dict: Muscle frequency data
         """
-        # Base queryset
-        workouts = WorkoutHistory.objects.filter(user=user)
-
-        # Apply date filters
-        if start_date:
-            workouts = workouts.filter(workout_date__gte=start_date)
-        if end_date:
-            workouts = workouts.filter(workout_date__lte=end_date)
+        workouts = cls._get_base_queryset(user, start_date, end_date)
+        
+        # Only fetch the fields we need
+        workouts_data = workouts.values('muscles_targeted', 'duration')
 
         # Parse muscles_targeted JSON field
         muscle_counts = defaultdict(int)
         muscle_durations = defaultdict(int)
+        total_workouts = 0
 
-        for workout in workouts:
-            if workout.muscles_targeted:
-                muscles = workout.muscles_targeted if isinstance(workout.muscles_targeted, list) else []
+        for workout in workouts_data:
+            total_workouts += 1
+            muscles_targeted = workout['muscles_targeted']
+            if muscles_targeted:
+                muscles = muscles_targeted if isinstance(muscles_targeted, list) else []
                 for muscle in muscles:
                     # Normalize muscle name (capitalize first letter)
                     muscle_name = muscle.strip().capitalize()
                     muscle_counts[muscle_name] += 1
-                    muscle_durations[muscle_name] += workout.duration
-
-        # Calculate total workouts for percentage
-        total_workouts = workouts.count()
+                    muscle_durations[muscle_name] += workout['duration']
 
         # Convert to list and sort by count
         muscle_frequency = []
@@ -243,10 +259,11 @@ class WorkoutAnalyticsService:
             'muscle_pairs': []  # Can implement common muscle combinations later
         }
 
-    @staticmethod
-    def get_consistency(user, start_date=None, end_date=None):
+    @classmethod
+    def get_consistency(cls, user, start_date=None, end_date=None):
         """
         Get consistency metrics including calendar data and day-of-week breakdown.
+        Optimized with bulk calendar data fetching.
 
         Args:
             user: User instance
@@ -259,51 +276,58 @@ class WorkoutAnalyticsService:
         # Get user profile for streak info
         profile = user.userprofile if hasattr(user, 'userprofile') else None
 
-        # Base queryset
-        workouts = WorkoutHistory.objects.filter(user=user)
+        workouts = cls._get_base_queryset(user, start_date, end_date)
 
-        # Apply date filters
-        if start_date:
-            workouts = workouts.filter(workout_date__gte=start_date)
-        if end_date:
-            workouts = workouts.filter(workout_date__lte=end_date)
+        # Pre-aggregate calendar data in a single query
+        calendar_data = {}
+        if start_date and end_date:
+            daily_stats = workouts.values('workout_date').annotate(
+                workout_count=Count('id'),
+                total_points=Sum('points_earned')
+            )
+            # Build lookup dict for O(1) access
+            for stat in daily_stats:
+                calendar_data[stat['workout_date']] = {
+                    'workout_count': stat['workout_count'],
+                    'total_points': stat['total_points'] or 0
+                }
 
-        # Generate calendar data
+        # Generate calendar with pre-fetched data
         workout_calendar = []
         if start_date and end_date:
             current_date = start_date
             while current_date <= end_date:
-                date_workouts = workouts.filter(workout_date=current_date)
-                workout_count = date_workouts.count()
-                total_points = date_workouts.aggregate(Sum('points_earned'))['points_earned__sum'] or 0
-
+                day_data = calendar_data.get(current_date, {'workout_count': 0, 'total_points': 0})
                 workout_calendar.append({
                     'date': current_date.strftime('%Y-%m-%d'),
-                    'has_workout': workout_count > 0,
-                    'workout_count': workout_count,
-                    'total_points': total_points
+                    'has_workout': day_data['workout_count'] > 0,
+                    'workout_count': day_data['workout_count'],
+                    'total_points': day_data['total_points']
                 })
                 current_date += timedelta(days=1)
 
-        # Day of week breakdown
+        # Day of week breakdown using database aggregation
+        day_mapping = {1: 'Sunday', 2: 'Monday', 3: 'Tuesday', 4: 'Wednesday', 
+                       5: 'Thursday', 6: 'Friday', 7: 'Saturday'}
+        
+        day_counts = workouts.annotate(
+            weekday=ExtractWeekDay('workout_date')
+        ).values('weekday').annotate(count=Count('id'))
+        
         day_of_week_breakdown = {
-            'Monday': 0,
-            'Tuesday': 0,
-            'Wednesday': 0,
-            'Thursday': 0,
-            'Friday': 0,
-            'Saturday': 0,
-            'Sunday': 0
+            'Monday': 0, 'Tuesday': 0, 'Wednesday': 0, 'Thursday': 0,
+            'Friday': 0, 'Saturday': 0, 'Sunday': 0
         }
-
-        for workout in workouts:
-            day_name = workout.workout_date.strftime('%A')
-            day_of_week_breakdown[day_name] += 1
+        for item in day_counts:
+            day_name = day_mapping.get(item['weekday'], 'Unknown')
+            if day_name in day_of_week_breakdown:
+                day_of_week_breakdown[day_name] = item['count']
 
         # Calculate weekly consistency
         total_workouts = workouts.count()
         weeks_in_period = ((end_date - start_date).days // 7) if start_date and end_date else 1
-        avg_per_week = total_workouts / weeks_in_period if weeks_in_period > 0 else 0
+        weeks_in_period = max(weeks_in_period, 1)  # Avoid division by zero
+        avg_per_week = total_workouts / weeks_in_period
 
         return {
             'current_streak': profile.current_streak if profile else 0,
@@ -319,10 +343,11 @@ class WorkoutAnalyticsService:
             'day_of_week_breakdown': day_of_week_breakdown
         }
 
-    @staticmethod
-    def get_records(user):
+    @classmethod
+    def get_records(cls, user):
         """
         Get personal records and milestones.
+        Optimized to minimize database queries.
 
         Args:
             user: User instance
@@ -331,23 +356,35 @@ class WorkoutAnalyticsService:
             dict: Personal records data
         """
         workouts = WorkoutHistory.objects.filter(user=user)
+        total_count = workouts.count()
 
-        if workouts.count() == 0:
+        if total_count == 0:
             return {
                 'records': {},
                 'recent_milestones': []
             }
 
-        # Find records
-        longest_workout = workouts.order_by('-duration').first()
-        highest_points = workouts.order_by('-points_earned').first()
+        # Get records in optimized queries
+        longest_workout = workouts.order_by('-duration').values(
+            'id', 'duration', 'workout_date'
+        ).first()
+        
+        highest_points = workouts.order_by('-points_earned').values(
+            'id', 'points_earned', 'workout_date'
+        ).first()
 
-        # Most exercises (parse exercises_completed JSON)
+        # For most exercises, we need to check JSON field length
+        # Fetch only necessary fields to minimize data transfer
+        workouts_with_exercises = workouts.exclude(
+            exercises_completed__isnull=True
+        ).values('id', 'exercises_completed', 'workout_date')
+        
         most_exercises_workout = None
         max_exercise_count = 0
-        for workout in workouts:
-            if workout.exercises_completed:
-                exercise_count = len(workout.exercises_completed) if isinstance(workout.exercises_completed, list) else 0
+        for workout in workouts_with_exercises:
+            exercises = workout['exercises_completed']
+            if exercises:
+                exercise_count = len(exercises) if isinstance(exercises, list) else 0
                 if exercise_count > max_exercise_count:
                     max_exercise_count = exercise_count
                     most_exercises_workout = workout
@@ -356,23 +393,23 @@ class WorkoutAnalyticsService:
 
         if longest_workout:
             records['longest_workout'] = {
-                'duration': longest_workout.duration,
-                'date': longest_workout.workout_date.strftime('%Y-%m-%d'),
-                'workout_id': longest_workout.id
+                'duration': longest_workout['duration'],
+                'date': longest_workout['workout_date'].strftime('%Y-%m-%d'),
+                'workout_id': longest_workout['id']
             }
 
         if highest_points:
             records['highest_points'] = {
-                'points': highest_points.points_earned,
-                'date': highest_points.workout_date.strftime('%Y-%m-%d'),
-                'workout_id': highest_points.id
+                'points': highest_points['points_earned'],
+                'date': highest_points['workout_date'].strftime('%Y-%m-%d'),
+                'workout_id': highest_points['id']
             }
 
         if most_exercises_workout:
             records['most_exercises'] = {
                 'count': max_exercise_count,
-                'date': most_exercises_workout.workout_date.strftime('%Y-%m-%d'),
-                'workout_id': most_exercises_workout.id
+                'date': most_exercises_workout['workout_date'].strftime('%Y-%m-%d'),
+                'workout_id': most_exercises_workout['id']
             }
 
         # Calculate milestones
@@ -380,17 +417,23 @@ class WorkoutAnalyticsService:
         milestones = []
 
         if profile:
-            # Check for workout count milestones
+            # Pre-fetch milestone workout dates in bulk
             workout_milestones = [10, 25, 50, 100, 250, 500]
-            for milestone in workout_milestones:
-                if profile.total_workouts >= milestone:
-                    # Find the workout that reached this milestone
-                    milestone_workout = workouts.order_by('workout_date')[milestone - 1] if workouts.count() >= milestone else None
-                    if milestone_workout:
+            applicable_milestones = [m for m in workout_milestones if profile.total_workouts >= m]
+            
+            if applicable_milestones:
+                max_milestone = max(applicable_milestones)
+                # Single query to get workout dates up to max milestone
+                milestone_workouts = list(workouts.order_by('workout_date').values_list(
+                    'workout_date', flat=True
+                )[:max_milestone])
+                
+                for milestone in applicable_milestones:
+                    if len(milestone_workouts) >= milestone:
                         milestones.append({
                             'type': 'total_workouts',
                             'value': milestone,
-                            'achieved_date': milestone_workout.workout_date.strftime('%Y-%m-%d')
+                            'achieved_date': milestone_workouts[milestone - 1].strftime('%Y-%m-%d')
                         })
 
             # Check for points milestones

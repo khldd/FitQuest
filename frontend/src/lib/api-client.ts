@@ -435,3 +435,88 @@ export const achievementsAPI = {
         return response.data;
     },
 };
+
+// Programs API
+export const programsAPI = {
+    // Get all programs
+    getAll: async (params?: {
+        difficulty?: string;
+        goal?: string;
+        is_featured?: boolean;
+        search?: string;
+        ordering?: string;
+    }) => {
+        const response = await apiClient.get('/workouts/programs/', { params });
+        return response.data;
+    },
+
+    // Get featured programs
+    getFeatured: async () => {
+        const response = await apiClient.get('/workouts/programs/featured/');
+        return response.data;
+    },
+
+    // Get single program with full schedule
+    getById: async (id: number) => {
+        const response = await apiClient.get(`/workouts/programs/${id}/`);
+        return response.data;
+    },
+
+    // Get program schedule (organized by week)
+    getSchedule: async (id: number) => {
+        const response = await apiClient.get(`/workouts/programs/${id}/schedule/`);
+        return response.data;
+    },
+
+    // Enroll in a program
+    enroll: async (programId: number) => {
+        const response = await apiClient.post('/workouts/enrollments/enroll/', { program_id: programId });
+        return response.data;
+    },
+
+    // Get user's active enrollment
+    getActiveEnrollment: async () => {
+        const response = await apiClient.get('/workouts/enrollments/active/');
+        return response.data;
+    },
+
+    // Get all user's enrollments
+    getEnrollments: async (params?: { status?: string; ordering?: string }) => {
+        const response = await apiClient.get('/workouts/enrollments/', { params });
+        return response.data;
+    },
+
+    // Get specific enrollment details
+    getEnrollment: async (id: number) => {
+        const response = await apiClient.get(`/workouts/enrollments/${id}/`);
+        return response.data;
+    },
+
+    // Complete a program day
+    completeDay: async (enrollmentId: number, data: {
+        program_day_id: number;
+        workout_history_id?: number;
+        notes?: string;
+    }) => {
+        const response = await apiClient.post(`/workouts/enrollments/${enrollmentId}/complete_day/`, data);
+        return response.data;
+    },
+
+    // Pause enrollment
+    pauseEnrollment: async (enrollmentId: number) => {
+        const response = await apiClient.post(`/workouts/enrollments/${enrollmentId}/pause/`);
+        return response.data;
+    },
+
+    // Resume enrollment
+    resumeEnrollment: async (enrollmentId: number) => {
+        const response = await apiClient.post(`/workouts/enrollments/${enrollmentId}/resume/`);
+        return response.data;
+    },
+
+    // Abandon enrollment
+    abandonEnrollment: async (enrollmentId: number) => {
+        const response = await apiClient.post(`/workouts/enrollments/${enrollmentId}/abandon/`);
+        return response.data;
+    },
+};

@@ -20,6 +20,24 @@ class WorkoutGenerator:
             'hypertrophy': {'min': 8, 'max': 12},
             'endurance': {'min': 12, 'max': 20}
         }
+        
+        # Map alternative muscle names to database names
+        self.muscle_name_map = {
+            'quadriceps': 'quads',
+            'core': 'abs',
+            'abdominals': 'abs',
+            'traps': 'back',
+            'trapezius': 'back',
+            'forearms': 'biceps',
+            'lats': 'back',
+            'lower back': 'back',
+            'lower_back': 'back',
+        }
+
+    def _normalize_muscle_name(self, muscle):
+        """Normalize muscle name to match database entries"""
+        muscle_lower = muscle.lower().strip()
+        return self.muscle_name_map.get(muscle_lower, muscle_lower)
 
     def generate_workout(self, muscles_targeted, duration, intensity, goal, equipment):
         """
@@ -41,7 +59,9 @@ class WorkoutGenerator:
         # Get exercises for each muscle group
         selected_exercises = []
         for muscle in muscles_targeted:
-            muscle_exercises = available_exercises.filter(primary_muscle=muscle)
+            # Normalize muscle name to match database
+            normalized_muscle = self._normalize_muscle_name(muscle)
+            muscle_exercises = available_exercises.filter(primary_muscle=normalized_muscle)
             if muscle_exercises.exists():
                 # Select 2-3 exercises per muscle group
                 count = min(3, muscle_exercises.count())

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import { Navbar } from "@/components/layout/Navbar";
+import { AppShell } from "@/components/layout/AppShell";
 import { Toaster } from "sonner";
 
 const geistSans = localFont({
@@ -17,7 +17,7 @@ const geistMono = localFont({
 
 export const metadata: Metadata = {
   title: "FitQuest",
-  description: "Gamified Workout Generator",
+  description: "Smart Workout Generation for Everyone",
   icons: {
     icon: "/favicon.svg",
   },
@@ -31,13 +31,12 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50 text-gray-900`}
       >
-        <Navbar />
-        <Toaster position="top-right" richColors />
-        <main className="pt-16">
+        <AppShell>
           {children}
-        </main>
+        </AppShell>
+        <Toaster position="top-right" richColors closeButton theme="light" />
       </body>
     </html>
   );

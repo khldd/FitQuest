@@ -3,7 +3,12 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
-from .models import WorkoutHistory, GeneratedWorkout
+from django.utils import timezone
+from .models import (
+    WorkoutHistory, GeneratedWorkout,
+    WorkoutProgram, ProgramDay, 
+    UserProgramEnrollment, ProgramDayCompletion
+)
 from .serializers import (
     WorkoutHistorySerializer,
     GeneratedWorkoutSerializer,
@@ -12,11 +17,276 @@ from .serializers import (
     TrendsDataSerializer,
     MuscleAnalyticsSerializer,
     ConsistencyDataSerializer,
-    PersonalRecordsSerializer
+    PersonalRecordsSerializer,
+    WorkoutProgramListSerializer,
+    WorkoutProgramDetailSerializer,
+    ProgramDaySerializer,
+    UserProgramEnrollmentSerializer,
+    UserProgramEnrollmentDetailSerializer,
+    EnrollProgramSerializer,
+    CompleteProgramDaySerializer,
+    ProgramDayCompletionSerializer,
 )
 from .workout_generator import WorkoutGenerator
 from .analytics import WorkoutAnalyticsService
 
+
+# ============== Program ViewSets ==============
+
+class WorkoutProgramViewSet(viewsets.ReadOnlyModelViewSet):
+    """ViewSet for browsing workout programs"""
+    queryset = WorkoutProgram.objects.filter(is_active=True)
+    permission_classes = [permissions.AllowAny]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['difficulty', 'goal', 'equipment_needed', 'is_featured']
+    search_fields = ['name', 'description']
+    ordering_fields = ['weeks', 'difficulty', 'created_at']
+    ordering = ['-is_featured', 'difficulty']
+
+    def get_serializer_class(self):
+        if self.action == 'retrieve':
+            return WorkoutProgramDetailSerializer
+        return WorkoutProgramListSerializer
+
+    @action(detail=False, methods=['get'])
+    def featured(self, request):
+        """Get featured programs"""
+        featured = self.queryset.filter(is_featured=True)[:6]
+        serializer = WorkoutProgramListSerializer(featured, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'])
+    def schedule(self, request, pk=None):
+        """Get full schedule/calendar for a program"""
+        program = self.get_object()
+        days = program.program_days.all()
+        
+        # Organize by week
+        schedule = {}
+        for day in days:
+            week_key = f"week_{day.week_number}"
+            if week_key not in schedule:
+                schedule[week_key] = {
+                    'week_number': day.week_number,
+                    'days': []
+                }
+            schedule[week_key]['days'].append(ProgramDaySerializer(day).data)
+        
+        return Response({
+            'program_id': program.id,
+            'program_name': program.name,
+            'total_weeks': program.weeks,
+            'schedule': list(schedule.values())
+        })
+
+
+class UserProgramEnrollmentViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing user program enrollments"""
+    serializer_class = UserProgramEnrollmentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['status', 'program']
+    ordering = ['-started_at']
+
+    def get_queryset(self):
+        return UserProgramEnrollment.objects.filter(
+            user=self.request.user
+        ).select_related('program')
+
+    def get_serializer_class(self):
+        if self.action == 'retrieve':
+            return UserProgramEnrollmentDetailSerializer
+        return UserProgramEnrollmentSerializer
+
+    @action(detail=False, methods=['post'])
+    def enroll(self, request):
+        """Enroll in a new program"""
+        serializer = EnrollProgramSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        program_id = serializer.validated_data['program_id']
+        
+        try:
+            program = WorkoutProgram.objects.get(id=program_id, is_active=True)
+        except WorkoutProgram.DoesNotExist:
+            return Response(
+                {'error': 'Program not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check if already enrolled
+        existing = UserProgramEnrollment.objects.filter(
+            user=request.user,
+            program=program,
+            status='active'
+        ).first()
+        
+        if existing:
+            return Response(
+                {'error': 'Already enrolled in this program', 'enrollment': UserProgramEnrollmentSerializer(existing).data},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Create enrollment
+        enrollment = UserProgramEnrollment.objects.create(
+            user=request.user,
+            program=program,
+            current_week=1,
+            current_day=1
+        )
+        
+        return Response(
+            UserProgramEnrollmentSerializer(enrollment).data,
+            status=status.HTTP_201_CREATED
+        )
+
+    @action(detail=True, methods=['post'])
+    def complete_day(self, request, pk=None):
+        """Mark a program day as complete"""
+        enrollment = self.get_object()
+        
+        if enrollment.status != 'active':
+            return Response(
+                {'error': 'Enrollment is not active'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        serializer = CompleteProgramDaySerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        program_day_id = serializer.validated_data['program_day_id']
+        workout_history_id = serializer.validated_data.get('workout_history_id')
+        notes = serializer.validated_data.get('notes', '')
+        
+        try:
+            program_day = ProgramDay.objects.get(
+                id=program_day_id,
+                program=enrollment.program
+            )
+        except ProgramDay.DoesNotExist:
+            return Response(
+                {'error': 'Program day not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check if already completed
+        if ProgramDayCompletion.objects.filter(
+            enrollment=enrollment,
+            program_day=program_day
+        ).exists():
+            return Response(
+                {'error': 'Day already completed'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get workout history if provided
+        workout_history = None
+        if workout_history_id:
+            workout_history = WorkoutHistory.objects.filter(
+                id=workout_history_id,
+                user=request.user
+            ).first()
+        
+        # Create completion record
+        completion = ProgramDayCompletion.objects.create(
+            enrollment=enrollment,
+            program_day=program_day,
+            workout_history=workout_history,
+            notes=notes
+        )
+        
+        # Update enrollment progress
+        enrollment.last_workout_at = timezone.now()
+        
+        # Advance to next day
+        next_day = program_day.day_number + 1
+        next_week = program_day.week_number
+        
+        if next_day > enrollment.program.days_per_week:
+            next_day = 1
+            next_week += 1
+        
+        if next_week > enrollment.program.weeks:
+            # Program completed!
+            enrollment.status = 'completed'
+            enrollment.completed_at = timezone.now()
+        else:
+            enrollment.current_week = next_week
+            enrollment.current_day = next_day
+        
+        enrollment.save()
+        
+        return Response({
+            'completion': ProgramDayCompletionSerializer(completion).data,
+            'enrollment': UserProgramEnrollmentSerializer(enrollment).data,
+            'program_completed': enrollment.status == 'completed'
+        })
+
+    @action(detail=True, methods=['post'])
+    def pause(self, request, pk=None):
+        """Pause an active enrollment"""
+        enrollment = self.get_object()
+        
+        if enrollment.status != 'active':
+            return Response(
+                {'error': 'Can only pause active enrollments'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        enrollment.status = 'paused'
+        enrollment.save()
+        
+        return Response(UserProgramEnrollmentSerializer(enrollment).data)
+
+    @action(detail=True, methods=['post'])
+    def resume(self, request, pk=None):
+        """Resume a paused enrollment"""
+        enrollment = self.get_object()
+        
+        if enrollment.status != 'paused':
+            return Response(
+                {'error': 'Can only resume paused enrollments'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        enrollment.status = 'active'
+        enrollment.save()
+        
+        return Response(UserProgramEnrollmentSerializer(enrollment).data)
+
+    @action(detail=True, methods=['post'])
+    def abandon(self, request, pk=None):
+        """Abandon an enrollment"""
+        enrollment = self.get_object()
+        
+        if enrollment.status in ['completed', 'abandoned']:
+            return Response(
+                {'error': 'Enrollment already finished'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        enrollment.status = 'abandoned'
+        enrollment.save()
+        
+        return Response(UserProgramEnrollmentSerializer(enrollment).data)
+
+    @action(detail=False, methods=['get'])
+    def active(self, request):
+        """Get user's currently active enrollment"""
+        enrollment = UserProgramEnrollment.objects.filter(
+            user=request.user,
+            status='active'
+        ).select_related('program').first()
+        
+        if not enrollment:
+            return Response(None)
+        
+        return Response(UserProgramEnrollmentDetailSerializer(enrollment).data)
+
+
+# ============== Existing ViewSets ==============
 
 class WorkoutHistoryViewSet(viewsets.ModelViewSet):
     """ViewSet for WorkoutHistory model"""

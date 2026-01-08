@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { WorkoutSummary } from '@/components/workout/WorkoutSummary';
 import { useWorkoutSessionStore } from '@/store/workout-session-store';
 import { useWorkoutConfigStore } from '@/store/workout-config-store';
@@ -38,6 +38,21 @@ const MOCK_WORKOUT = [
 export default function ActiveWorkoutPage() {
     const { workout } = useWorkoutSessionStore();
     const { intensity, goal, duration } = useWorkoutConfigStore();
+    const [isHydrated, setIsHydrated] = useState(false);
+
+    // Wait for client-side hydration
+    useEffect(() => {
+        setIsHydrated(true);
+    }, []);
+
+    // Show loading state until hydrated
+    if (!isHydrated) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+        );
+    }
 
     // If we have a generated workout from the API, use it
     if (workout && workout.exercises) {

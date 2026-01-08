@@ -3,14 +3,28 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
-import { authAPI, workoutAPI, achievementsAPI } from '@/lib/api-client';
-import { Card } from '@/components/ui/card';
+import { authAPI, workoutAPI, achievementsAPI, programsAPI } from '@/lib/api-client';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Dumbbell, Zap, TrendingUp, Trophy, History, Loader2, Flame, Clock, CheckCircle2, Award } from 'lucide-react';
+import { 
+  ArrowRight, 
+  Dumbbell, 
+  CalendarDays,
+  Target,
+  Trophy,
+  Activity,
+  Zap,
+  Apple,
+  Users,
+  Bot,
+  Calendar,
+  Play,
+  ChevronRight
+} from 'lucide-react';
 
 export default function HomePage() {
   const router = useRouter();
@@ -18,59 +32,56 @@ export default function HomePage() {
   const [profile, setProfile] = useState<any>(null);
   const [recentWorkouts, setRecentWorkouts] = useState<any[]>([]);
   const [recentAchievements, setRecentAchievements] = useState<any[]>([]);
+  const [activeEnrollment, setActiveEnrollment] = useState<any>(null);
+  const [featuredPrograms, setFeaturedPrograms] = useState<any[]>([]);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [error, setError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) {
-      loadUserProfile();
-      loadRecentWorkouts();
-      loadRecentAchievements();
+      loadDashboardData();
     }
   }, [isAuthenticated]);
 
-  const loadUserProfile = async () => {
+  const loadDashboardData = async () => {
+    // Batch all API calls with Promise.all for better performance
     try {
-      const data = await authAPI.getProfile();
-      setProfile(data);
-    } catch (err) {
-      console.error('Failed to load profile:', err);
-    }
-  };
+      const [profileData, workoutsResponse, achievementsResponse, featuredResponse] = await Promise.all([
+        authAPI.getProfile(),
+        workoutAPI.getHistory({ ordering: '-workout_date' }),
+        achievementsAPI.getUnlockedAchievements({ ordering: '-unlocked_at' }),
+        programsAPI.getFeatured(),
+      ]);
 
-  const loadRecentWorkouts = async () => {
-    try {
-      const response = await workoutAPI.getHistory({ ordering: '-workout_date' });
-      // Get the 5 most recent workouts
-      const workouts = response.results || response;
-      setRecentWorkouts(Array.isArray(workouts) ? workouts.slice(0, 5) : []);
-    } catch (err) {
-      console.error('Failed to load recent workouts:', err);
-    }
-  };
+      setProfile(profileData);
 
-  const loadRecentAchievements = async () => {
-    try {
-      const response = await achievementsAPI.getUnlockedAchievements({ 
-        ordering: '-unlocked_at' 
-      });
-      // Get the 3 most recent achievements
-      const achievements = response.results || response;
+      // Handle paginated responses
+      const workouts = workoutsResponse.results || workoutsResponse;
+      setRecentWorkouts(Array.isArray(workouts) ? workouts.slice(0, 3) : []);
+
+      const achievements = achievementsResponse.results || achievementsResponse;
       setRecentAchievements(Array.isArray(achievements) ? achievements.slice(0, 3) : []);
+
+      setFeaturedPrograms(Array.isArray(featuredResponse) ? featuredResponse.slice(0, 2) : []);
+
+      // Try to get active enrollment (may not exist)
+      try {
+        const enrollment = await programsAPI.getActiveEnrollment();
+        setActiveEnrollment(enrollment);
+      } catch {
+        setActiveEnrollment(null);
+      }
     } catch (err) {
-      console.error('Failed to load recent achievements:', err);
+      console.error('Failed to load dashboard data:', err);
     }
   };
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  const getTimeGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -80,307 +91,289 @@ export default function HomePage() {
     setLoading(true);
 
     try {
-      const tokenResponse = await authAPI.login(loginForm.username, loginForm.password);
-      setTokens(tokenResponse.access, tokenResponse.refresh);
-      const profileResponse = await authAPI.getProfile();
-      setUser(profileResponse.user);
+        const tokenResponse = await authAPI.login(loginForm.username, loginForm.password);
+        setTokens(tokenResponse.access, tokenResponse.refresh);
+        const profileResponse = await authAPI.getProfile();
+        setUser(profileResponse.user);
     } catch (err: any) {
-      setError('Invalid credentials.');
+        setError('Invalid credentials.');
     } finally {
-      setIsLoggingIn(false);
-      setLoading(false);
+        setIsLoggingIn(false);
+        setLoading(false);
     }
   };
 
-  // Not logged in - show compact login
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-background to-primary/5">
-        <Card className="w-full max-w-md p-8 space-y-6">
-          <div className="text-center space-y-2">
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <Dumbbell className="w-10 h-10 text-primary" />
-              <h1 className="text-3xl font-bold">FitQuest</h1>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50/50 p-4">
+        <Card className="w-full max-w-md shadow-sm border-gray-200">
+          <CardHeader className="space-y-1 text-center pb-2">
+            <div className="flex justify-center mb-4">
+                <div className="p-3 bg-indigo-50 rounded-xl">
+                  <Zap className="w-8 h-8 text-indigo-600 fill-current" />
+                </div>
             </div>
-            <p className="text-muted-foreground">Track workouts. Level up. Get stronger.</p>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-4">
-            {error && (
-              <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
-                {error}
+            <CardTitle className="text-2xl font-bold tracking-tight text-gray-900">Sign in to fitQuest</CardTitle>
+            <p className="text-sm text-gray-500">Welcome back! Please enter your details.</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <form onSubmit={handleLogin} className="space-y-4">
+              {error && (
+                <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm font-medium">
+                  {error}
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="username">Username</Label>
+                <Input
+                  id="username"
+                  placeholder="Enter your username"
+                  value={loginForm.username}
+                  onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
+                  className="bg-gray-50 border-gray-200 focus:bg-white transition-colors"
+                  required
+                />
               </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
-              <Input
-                id="username"
-                value={loginForm.username}
-                onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
-                required
-                disabled={isLoggingIn}
-              />
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={loginForm.password}
+                  onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                  className="bg-gray-50 border-gray-200 focus:bg-white transition-colors"
+                  required
+                />
+              </div>
+              <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium h-10" disabled={isLoggingIn}>
+                {isLoggingIn ? 'Signing in...' : 'Sign in'}
+              </Button>
+            </form>
+            <div className="text-center text-sm pt-2">
+              <span className="text-gray-500">Don't have an account? </span>
+              <Button variant="link" className="p-0 h-auto text-indigo-600 hover:text-indigo-700 font-medium" onClick={() => router.push('/auth/register')}>
+                Sign up
+              </Button>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={loginForm.password}
-                onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                required
-                disabled={isLoggingIn}
-              />
-            </div>
-
-            <Button type="submit" className="w-full" disabled={isLoggingIn}>
-              {isLoggingIn ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Logging in...</> : 'Login'}
-            </Button>
-          </form>
-
-          <div className="text-center text-sm">
-            <span className="text-muted-foreground">No account? </span>
-            <Button variant="link" className="p-0 h-auto" onClick={() => router.push('/auth/register')}>
-              Sign up
-            </Button>
-          </div>
+          </CardContent>
         </Card>
       </div>
     );
   }
 
-  // Logged in - show dashboard
-  const xpProgress = profile ? ((profile.total_points % 100) / 100) * 100 : 0;
-  const nextLevel = profile ? profile.level + 1 : 1;
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
-      <main className="container mx-auto px-4 py-8 max-w-6xl">
-        <div className="grid gap-6">
-          {/* Stats Card */}
-          <Card className="p-6">
-            <h2 className="text-2xl font-bold mb-6">Your Progress</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                  <Trophy className="w-4 h-4" />
-                  <span>Level</span>
+    <div className="space-y-8 animate-in fade-in duration-500">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">
+            {getTimeGreeting()}, {profile?.user?.username || 'Guest'}
+          </h1>
+          <p className="text-gray-500 mt-1">Here's what's happening with your fitness journey today.</p>
+        </div>
+        <Button onClick={() => router.push('/generator/muscle-selection')} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm hover:shadow transition-all font-medium">
+            Generate Workout <ArrowRight className="w-4 h-4 ml-2" />
+        </Button>
+      </div>
+
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="hover:shadow-md transition-shadow duration-200 border-gray-100">
+            <CardContent className="p-6 flex items-center gap-4">
+                <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
+                    <Activity className="w-6 h-6" />
                 </div>
-                <div className="text-3xl font-bold">{profile?.level || 1}</div>
-                <div className="space-y-1">
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>{profile?.total_points || 0} XP</span>
-                    <span>Next: {nextLevel * 100} XP</span>
-                  </div>
-                  <Progress value={xpProgress} className="h-2" />
+                <div>
+                    <p className="text-sm font-medium text-gray-500">Level {profile?.level || 1}</p>
+                    <h3 className="text-2xl font-bold text-gray-900">{profile?.total_points || 0} XP</h3>
+                </div>
+            </CardContent>
+        </Card>
+        <Card className="hover:shadow-md transition-shadow duration-200 border-gray-100">
+            <CardContent className="p-6 flex items-center gap-4">
+                <div className="p-3 bg-orange-50 text-orange-600 rounded-xl">
+                    <Target className="w-6 h-6" />
+                </div>
+                <div>
+                    <p className="text-sm font-medium text-gray-500">Current Streak</p>
+                    <h3 className="text-2xl font-bold text-gray-900">{profile?.current_streak || 0} Days</h3>
+                </div>
+            </CardContent>
+        </Card>
+        <Card className="hover:shadow-md transition-shadow duration-200 border-gray-100">
+            <CardContent className="p-6 flex items-center gap-4">
+                <div className="p-3 bg-green-50 text-green-600 rounded-xl">
+                    <Trophy className="w-6 h-6" />
+                </div>
+                <div>
+                    <p className="text-sm font-medium text-gray-500">Workouts Completed</p>
+                    <h3 className="text-2xl font-bold text-gray-900">{profile?.total_workouts || 0}</h3>
+                </div>
+            </CardContent>
+        </Card>
+      </div>
+
+      {/* Quick Access Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Button variant="outline" className="h-24 flex flex-col gap-2 hover:border-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all border-gray-200" onClick={() => router.push('/programs')}>
+            <Calendar className="w-6 h-6" />
+            <span className="font-semibold">Programs</span>
+        </Button>
+        <Button variant="outline" className="h-24 flex flex-col gap-2 hover:border-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all border-gray-200" onClick={() => router.push('/nutrition')}>
+            <Apple className="w-6 h-6" />
+            <span className="font-semibold">Nutrition</span>
+        </Button>
+        <Button variant="outline" className="h-24 flex flex-col gap-2 hover:border-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all border-gray-200" onClick={() => router.push('/social')}>
+            <Users className="w-6 h-6" />
+            <span className="font-semibold">Community</span>
+        </Button>
+        <Button variant="outline" className="h-24 flex flex-col gap-2 hover:border-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all border-gray-200" onClick={() => router.push('/coach')}>
+            <Bot className="w-6 h-6" />
+            <span className="font-semibold">AI Coach</span>
+        </Button>
+      </div>
+
+      {/* Active Program or Featured Programs */}
+      {activeEnrollment ? (
+        <Card className="bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border-indigo-200">
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="text-4xl p-3 bg-white rounded-xl shadow-sm">
+                  {activeEnrollment.program?.icon || '📋'}
+                </div>
+                <div>
+                  <p className="text-sm text-indigo-600 font-medium">Active Program</p>
+                  <h3 className="text-xl font-bold text-gray-900">{activeEnrollment.program?.name}</h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Week {activeEnrollment.current_week} • Day {activeEnrollment.current_day} • {activeEnrollment.completion_percentage}% complete
+                  </p>
                 </div>
               </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                  <Flame className="w-4 h-4" />
-                  <span>Current Streak</span>
-                </div>
-                <div className="text-3xl font-bold">{profile?.current_streak || 0} days</div>
-                <div className="text-sm text-muted-foreground">
-                  Best: {profile?.longest_streak || 0} days
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                  <TrendingUp className="w-4 h-4" />
-                  <span>Total Workouts</span>
-                </div>
-                <div className="text-3xl font-bold">{profile?.total_workouts || 0}</div>
-                <div className="text-sm text-muted-foreground">
-                  Keep it up!
-                </div>
+              <Button onClick={() => router.push(`/programs/${activeEnrollment.program?.id}`)} className="bg-indigo-600 hover:bg-indigo-700">
+                <Play className="w-4 h-4 mr-2" />
+                Continue
+              </Button>
+            </div>
+            <div className="mt-4">
+              <div className="h-2 bg-white/50 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-indigo-600 transition-all duration-500" 
+                  style={{ width: `${activeEnrollment.completion_percentage}%` }}
+                />
               </div>
             </div>
-          </Card>
-
-          {/* Quick Actions */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Button
-              size="lg"
-              className="h-24 text-lg gap-3 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-500"
-              onClick={() => router.push('/generator/muscle-selection')}
-            >
-              <Zap className="w-6 h-6" />
-              Generate New Workout
-            </Button>
-
-            <Button
-              size="lg"
-              variant="outline"
-              className="h-24 text-lg gap-3"
-              onClick={() => router.push('/analytics')}
-            >
-              <TrendingUp className="w-6 h-6" />
-              View Analytics
-            </Button>
-
-            <Button
-              size="lg"
-              variant="outline"
-              className="h-24 text-lg gap-3"
-              onClick={() => router.push('/history')}
-            >
-              <History className="w-6 h-6" />
-              Workout History
-            </Button>
-
-            <Button
-              size="lg"
-              variant="outline"
-              className="h-24 text-lg gap-3"
-              onClick={() => router.push('/achievements')}
-            >
-              <Trophy className="w-6 h-6" />
-              My Achievements
+          </CardContent>
+        </Card>
+      ) : featuredPrograms.length > 0 ? (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-indigo-600" />
+              Featured Programs
+            </h2>
+            <Button variant="ghost" size="sm" className="text-gray-500 hover:text-indigo-600" onClick={() => router.push('/programs')}>
+              Browse all <ChevronRight className="w-4 h-4 ml-1" />
             </Button>
           </div>
-
-          {/* Recent Activity */}
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Recent Activity</h3>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => router.push('/history')}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {featuredPrograms.map((program: any) => (
+              <Card 
+                key={program.id} 
+                className="hover:shadow-md transition-all cursor-pointer border-gray-100 hover:border-indigo-200"
+                onClick={() => router.push(`/programs/${program.id}`)}
               >
-                View All
-              </Button>
-            </div>
-            
-            {recentWorkouts.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <p>No recent workouts yet.</p>
-                <p className="text-sm mt-2">Generate your first workout to get started!</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {recentWorkouts.map((workout) => (
-                  <div 
-                    key={workout.id} 
-                    className="flex items-center gap-4 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
-                    onClick={() => router.push('/history')}
-                  >
-                    <div className={`
-                      p-2 rounded-full
-                      ${workout.status === 'completed' 
-                        ? 'bg-green-500/20 text-green-400' 
-                        : 'bg-yellow-500/20 text-yellow-400'}
-                    `}>
-                      <CheckCircle2 className="w-4 h-4" />
+                <CardContent className="p-5">
+                  <div className="flex items-start gap-4">
+                    <div className="text-3xl p-2 rounded-lg" style={{ backgroundColor: program.color + '20' }}>
+                      {program.icon}
                     </div>
-                    
-                    <div className="flex-grow min-w-0">
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-medium truncate">
-                          {workout.muscles_targeted?.slice(0, 2).join(', ')}
-                          {workout.muscles_targeted?.length > 2 && ` +${workout.muscles_targeted.length - 2}`}
-                        </span>
-                        <Badge variant="secondary" className="text-xs capitalize">
-                          {workout.goal}
-                        </Badge>
+                        <Badge variant="outline" className="text-xs capitalize">{program.difficulty}</Badge>
+                        <Badge variant="secondary" className="text-xs">{program.duration_weeks} weeks</Badge>
                       </div>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          {workout.duration}m
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Dumbbell className="w-3 h-3" />
-                          {workout.exercises_completed?.length || 0} exercises
-                        </span>
-                        <span>{formatDate(workout.workout_date)}</span>
-                      </div>
+                      <h4 className="font-semibold text-gray-900 truncate">{program.name}</h4>
+                      <p className="text-sm text-gray-500 line-clamp-1 mt-1">{program.description}</p>
                     </div>
-                    
-                    {workout.status === 'completed' && workout.points_earned > 0 && (
-                      <div className="text-sm font-medium text-primary">
-                        +{workout.points_earned} XP
-                      </div>
-                    )}
+                    <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
                   </div>
-                ))}
-              </div>
-            )}
-          </Card>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
-          {/* Recent Achievements */}
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-yellow-500" />
-                Recent Achievements
-              </h3>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => router.push('/achievements')}
-              >
-                View All
-              </Button>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Recent Activity */}
+        <div className="lg:col-span-2 space-y-4">
+            <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-gray-900">Recent Activity</h2>
+                <Button variant="ghost" size="sm" className="text-gray-500 hover:text-indigo-600" onClick={() => router.push('/history')}>View all</Button>
             </div>
             
-            {recentAchievements.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <p>No achievements unlocked yet.</p>
-                <p className="text-sm mt-2">Complete workouts to unlock achievements!</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {recentAchievements.map((userAchievement: any) => {
-                  const achievement = userAchievement.achievement;
-                  const tierColors: Record<string, string> = {
-                    bronze: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-                    silver: 'bg-gray-400/20 text-gray-300 border-gray-400/30',
-                    gold: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-                    platinum: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
-                  };
-                  
-                  return (
-                    <div 
-                      key={userAchievement.id} 
-                      className="flex items-center gap-4 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
-                      onClick={() => router.push('/achievements')}
-                    >
-                      <div className={`p-3 rounded-full text-2xl ${tierColors[achievement.tier]}`}>
-                        {achievement.icon}
-                      </div>
-                      
-                      <div className="flex-grow min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-medium">{achievement.name}</span>
-                          <Badge 
-                            variant="secondary" 
-                            className={`text-xs capitalize ${tierColors[achievement.tier]}`}
-                          >
-                            {achievement.tier}
-                          </Badge>
+            <Card className="border-gray-100 overflow-hidden">
+                <div className="divide-y divide-gray-100">
+                    {recentWorkouts.length > 0 ? recentWorkouts.map((workout: any) => (
+                        <div key={workout.id} className="p-4 hover:bg-gray-50 transition-colors flex items-center gap-4 group cursor-pointer" onClick={() => router.push(`/history`)}>
+                           <div className="p-2.5 bg-gray-100 rounded-lg text-gray-600 group-hover:bg-white group-hover:text-indigo-600 group-hover:shadow-sm transition-all">
+                                <Dumbbell className="w-5 h-5" />
+                           </div>
+                           <div className="flex-1">
+                                <h4 className="font-medium text-gray-900 capitalize flex items-center gap-2">
+                                    {(workout.muscles_targeted || []).join(', ')}
+                                    <Badge variant="secondary" className="text-[10px] font-normal text-gray-500 bg-gray-100 hover:bg-gray-100">{workout.goal}</Badge>
+                                </h4>
+                                <p className="text-sm text-gray-500 mt-0.5">
+                                    {workout.exercises_completed?.length || 0} Exercises • {new Date(workout.workout_date).toLocaleDateString()}
+                                </p>
+                           </div>
+                           <div className="text-right">
+                                <span className="text-sm font-medium text-green-600">+{workout.points_earned} XP</span>
+                           </div>
                         </div>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {achievement.description}
-                        </p>
-                      </div>
-                      
-                      <div className="text-sm font-medium text-primary">
-                        +{achievement.points} XP
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </Card>
+                    )) : (
+                        <div className="p-8 text-center text-gray-500">
+                            <CalendarDays className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                            <p>No workouts recorded yet.</p>
+                        </div>
+                    )}
+                </div>
+            </Card>
         </div>
-      </main>
+
+        {/* Recent Achievements - Side Panel */}
+        <div className="space-y-4">
+            <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-gray-900">Latest Achievements</h2>
+                <Button variant="ghost" size="sm" className="text-gray-500 hover:text-indigo-600" onClick={() => router.push('/achievements')}>View all</Button>
+            </div>
+             <Card className="border-gray-100">
+                <CardContent className="p-0">
+                    {recentAchievements.length > 0 ? (
+                        <div className="divide-y divide-gray-100">
+                            {recentAchievements.map((item: any) => (
+                                <div key={item.id} className="p-4 flex gap-3">
+                                    <div className="text-2xl filter grayscale opacity-80">{item.achievement.icon}</div>
+                                    <div>
+                                        <p className="font-medium text-sm text-gray-900">{item.achievement.name}</p>
+                                        <p className="text-xs text-gray-500 line-clamp-1">{item.achievement.description}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="p-8 text-center text-gray-500">
+                            <Trophy className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                            <p className="text-sm">Start working out to earn badges!</p>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
+      </div>
     </div>
   );
 }

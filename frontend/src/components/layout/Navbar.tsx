@@ -43,6 +43,8 @@ const NAV_LINKS = [
     { href: '/achievements', label: 'Achievements', icon: Trophy },
     { href: '/analytics', label: 'Analytics', icon: BarChart3 },
     { href: '/history', label: 'History', icon: History },
+    { href: '/nutrition', label: 'Nutrition', icon: Apple },
+    { href: '/coach', label: 'AI Coach', icon: Bot },
 ];
 
 export function Navbar() {
